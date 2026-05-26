@@ -2,6 +2,7 @@ package com.omoikaneinnovations.omoiservespare.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.omoikaneinnovations.omoiservespare.domain.AccountType;
@@ -15,16 +16,24 @@ import java.util.UUID;
 public class JwtUtil {
 
     /**
-     * 🔐 256-bit secret (DO NOT hardcode in prod)
+     * 🔐 JWT Secret from application.properties / Render env
      */
-    private static final String SECRET_KEY = "THIS_IS_A_VERY_LONG_SECRET_KEY_FOR_JWT_256_BITS_SECURITY";
+    @Value("${jwt.secret}")
+    private String secretKey;
 
     /**
      * ⏱ Access token validity
      */
     private static final long ACCESS_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24; // 24 hours
 
-    private final Key key = Keys.hmacShaKeyFor(SECRET_KEY.getBytes(StandardCharsets.UTF_8));
+    /*
+     * =========================
+     * GET SIGNING KEY
+     * =========================
+     */
+    private Key getSigningKey() {
+        return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
+    }
 
     /*
      * =========================
@@ -39,7 +48,7 @@ public class JwtUtil {
                 .setIssuedAt(new Date())
                 .setExpiration(
                         new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION))
-                .signWith(key, SignatureAlgorithm.HS256)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -53,7 +62,7 @@ public class JwtUtil {
                 .claim("accountType", accountType)
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION))
-                .signWith(key, SignatureAlgorithm.HS256)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -105,7 +114,7 @@ public class JwtUtil {
     private Claims getClaims(String token) {
 
         return Jwts.parserBuilder()
-                .setSigningKey(key)
+                .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
