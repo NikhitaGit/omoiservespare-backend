@@ -1,0 +1,416 @@
+===========================================
+FRONTEND CODE UPDATES - COPY & PASTE READY
+===========================================
+
+This file contains the exact code you need to update in your frontend React components.
+
+===========================================
+FILE 1: Feedback.jsx (User Submission)
+===========================================
+
+Replace the handleSubmit function with this:
+
+const handleSubmit = async () => {
+  if (!feedback.trim()) {
+    alert("Please enter your feedback");
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem("token"); // Your JWT token key
+    
+    const response = await fetch("http://localhost:8080/api/feedback", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        rating: 5, // TODO: Add rating input to your form (1-5 stars)
+        comments: feedback
+      })
+    });
+
+    if (response.ok) {
+      alert("Thank you for your feedback!");
+      setFeedback("");
+      navigate(-1);
+    } else {
+      const error = await response.json();
+      alert(`Error: ${error.message}`);
+    }
+  } catch (error) {
+    console.error("Failed to submit feedback:", error);
+    alert("Failed to submit feedback. Please try again.");
+  }
+};
+
+NOTES:
+- Replace localStorage feedback storage with this API call
+- Add a rating input (1-5 stars) to your form
+- Make sure you have the JWT token stored in localStorage
+
+===========================================
+FILE 2: App_Feedback.jsx (Admin Dashboard)
+===========================================
+
+Replace the entire component with this production-ready version:
+
+
+import React, { useState, useEffect } from "react";
+import "./App_Feedback.css";
+
+const Feedback = () => {
+  const [feedbackData, setFeedbackData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const [statusFilter, setStatusFilter] = useState("ALL");
+
+  const token = localStorage.getItem("token"); // Your JWT token key
+
+  // Fetch feedback from backend
+  const fetchFeedback = async () => {
+    setLoading(true);
+    try {
+      const statusParam = statusFilter !== "ALL" ? `&status=${statusFilter}` : "";
+      const response = await fetch(
+        `http://localhost:8080/api/feedback?page=${page}&size=20${statusParam}`,
+        {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setFeedbackData(data.content);
+        setTotalPages(data.totalPages);
+        setTotalElements(data.totalElements);
+      } else if (response.status === 403) {
+        alert("Access denied. Only company admins can view feedback.");
+      } else {
+        alert("Failed to load feedback");
+      }
+    } catch (error) {
+      console.error("Error loading feedback:", error);
+      alert("Error loading feedback");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load feedback on mount and when filters change
+  useEffect(() => {
+    fetchFeedback();
+    
+    // Poll for updates every 30 seconds (real-time updates)
+    const interval = setInterval(fetchFeedback, 30000);
+    return () => clearInterval(interval);
+  }, [page, statusFilter]);
+
+  // Mark as reviewed
+  const markAsReviewed = async (id) => {
+    try {
+      const response = await fetch(
+        `http://localhost:8080/api/feedback/${id}/review`,
+        {
+          method: "PUT",
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        fetchFeedback(); // Refresh list
+        alert("Feedback marked as reviewed");
+      } else {
+        alert("Failed to update status");
+      }
+    } catch (error) {
+      console.error("Failed to update status:", error);
+      alert("Failed to update status");
+    }
+  };
+
+  // CSV Download
+  const downloadCSV = async () => {
+    try {
+      const response = await fetch(
+        "http://localhost:8080/api/feedback/export/csv",
+        {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `feedback_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        alert("Failed to export CSV");
+      }
+    } catch (error) {
+      console.error("Failed to export CSV:", error);
+      alert("Failed to export CSV");
+    }
+  };
+
+  // Excel Download
+  const downloadExcel = async () => {
+    try {
+      const response = await fetch(
+        "http://localhost:8080/api/feedback/export/excel",
+        {
+          headers: {
+            "Authorization": `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `feedback_${new Date().toISOString().split('T')[0]}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        alert("Failed to export Excel");
+      }
+    } catch (error) {
+      console.error("Failed to export Excel:", error);
+      alert("Failed to export Excel");
+    }
+  };
+
+  // Average Rating
+  const avgRating = feedbackData.length > 0
+    ? feedbackData.reduce((acc, f) => acc + f.rating, 0) / feedbackData.length
+    : 0;
+
+  return (
+    <div className="feedback-page">
+      <h2>User Feedback & Ratings</h2>
+
+      {/* SUMMARY */}
+      <div className="rating-summary">
+        <h3>Average Rating</h3>
+        <div className="stars">{"⭐".repeat(Math.round(avgRating))}</div>
+        <p>{avgRating.toFixed(1)} / 5</p>
+        <p>Total Feedback: {totalElements}</p>
+      </div>
+
+      {/* FILTERS */}
+      <div className="filters">
+        <label>Filter by Status: </label>
+        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}>
+          <option value="ALL">All Feedback</option>
+          <option value="NEW">New</option>
+          <option value="REVIEWED">Reviewed</option>
+        </select>
+      </div>
+
+      {/* DOWNLOAD BUTTONS */}
+      <div className="download-buttons">
+        <button className="csv" onClick={downloadCSV}>Download CSV</button>
+        <button className="excel" onClick={downloadExcel}>Download Excel</button>
+      </div>
+
+      {/* TABLE */}
+      {loading ? (
+        <p>Loading feedback...</p>
+      ) : feedbackData.length === 0 ? (
+        <p>No feedback available</p>
+      ) : (
+        <table className="feedback-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>User</th>
+              <th>Rating</th>
+              <th>Comment</th>
+              <th>Status</th>
+              <th>Submitted</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {feedbackData.map((f) => (
+              <tr key={f.id}>
+                <td>{f.id}</td>
+                <td>{f.userEmail}</td>
+                <td>{"⭐".repeat(f.rating)}</td>
+                <td>{f.comments}</td>
+                <td>
+                  <span className={`status-badge ${f.status.toLowerCase()}`}>
+                    {f.status}
+                  </span>
+                </td>
+                <td>{new Date(f.createdAt).toLocaleDateString()}</td>
+                <td>
+                  {f.status === "NEW" && (
+                    <button 
+                      className="review-btn"
+                      onClick={() => markAsReviewed(f.id)}
+                    >
+                      Mark Reviewed
+                    </button>
+                  )}
+                  {f.status === "REVIEWED" && f.reviewedAt && (
+                    <small>Reviewed: {new Date(f.reviewedAt).toLocaleDateString()}</small>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      {/* PAGINATION */}
+      {totalPages > 1 && (
+        <div className="pagination">
+          <button 
+            disabled={page === 0} 
+            onClick={() => setPage(page - 1)}
+          >
+            Previous
+          </button>
+          <span>Page {page + 1} of {totalPages}</span>
+          <button 
+            disabled={page >= totalPages - 1} 
+            onClick={() => setPage(page + 1)}
+          >
+            Next
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Feedback;
+
+===========================================
+OPTIONAL: Add CSS for status badges
+===========================================
+
+Add this to your App_Feedback.css:
+
+.filters {
+  margin: 20px 0;
+}
+
+.filters label {
+  margin-right: 10px;
+  font-weight: bold;
+}
+
+.filters select {
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.status-badge.new {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.status-badge.reviewed {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.review-btn {
+  padding: 6px 12px;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.review-btn:hover {
+  background-color: #2563eb;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.pagination button {
+  padding: 8px 16px;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.pagination button:disabled {
+  background-color: #cbd5e1;
+  cursor: not-allowed;
+}
+
+===========================================
+TESTING CHECKLIST
+===========================================
+
+After updating the frontend:
+
+1. ✅ Start backend: mvnw spring-boot:run
+2. ✅ Start frontend: npm run dev
+3. ✅ Login as regular user
+4. ✅ Submit feedback (should see success message)
+5. ✅ Login as PROFESSIONAL user
+6. ✅ View feedback dashboard (should see submitted feedback)
+7. ✅ Mark feedback as reviewed
+8. ✅ Download CSV (should download file)
+9. ✅ Download Excel (should download file)
+10. ✅ Test status filter (NEW/REVIEWED/ALL)
+11. ✅ Test pagination (if you have >20 feedback items)
+12. ✅ Wait 30 seconds (should auto-refresh)
+
+===========================================
+TROUBLESHOOTING
+===========================================
+
+If you get 401 Unauthorized:
+- Check JWT token is stored in localStorage
+- Verify token key name matches your app
+- Check token hasn't expired
+
+If you get 403 Forbidden:
+- Only PROFESSIONAL users can access admin dashboard
+- Check user accountType in database
+
+If exports don't work:
+- Check browser console for errors
+- Verify backend is running
+- Check JWT token is valid
+
+===========================================
+END OF FILE
+===========================================

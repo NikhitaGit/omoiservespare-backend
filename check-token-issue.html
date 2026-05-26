@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Token Diagnostic Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background: #d1fae5;
+            color: #065f46;
+            border-left: 4px solid #10b981;
+        }
+        .error {
+            background: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+        .warning {
+            background: #fef3c7;
+            color: #92400e;
+            border-left: 4px solid #f59e0b;
+        }
+        .info {
+            background: #dbeafe;
+            color: #1e40af;
+            border-left: 4px solid #3b82f6;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border: 1px solid #dee2e6;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Token Diagnostic Tool</h1>
+        <p>This tool helps diagnose the "No authentication token found" error.</p>
+
+        <div class="section">
+            <h2>Step 1: Check Token Status</h2>
+            <button class="btn-primary" onclick="checkToken()">Check Token</button>
+            <div id="tokenStatus"></div>
+        </div>
+
+        <div class="section">
+            <h2>Step 2: Check All LocalStorage</h2>
+            <button class="btn-primary" onclick="checkAllStorage()">View All Storage</button>
+            <div id="storageStatus"></div>
+        </div>
+
+        <div class="section">
+            <h2>Step 3: Test API Connection</h2>
+            <button class="btn-primary" onclick="testAPI()">Test Backend</button>
+            <div id="apiStatus"></div>
+        </div>
+
+        <div class="section">
+            <h2>Step 4: Manual Token Entry (For Testing)</h2>
+            <input type="text" id="manualToken" placeholder="Paste your token here" style="width: 100%; padding: 10px; margin: 10px 0;">
+            <button class="btn-success" onclick="setManualToken()">Set Token</button>
+            <button class="btn-danger" onclick="clearToken()">Clear Token</button>
+        </div>
+
+        <div class="section">
+            <h2>Step 5: Solutions</h2>
+            <div id="solutions"></div>
+        </div>
+    </div>
+
+    <script>
+        function checkToken() {
+            const token = localStorage.getItem('token');
+            const statusDiv = document.getElementById('tokenStatus');
+            
+            if (!token) {
+                statusDiv.innerHTML = `
+                    <div class="status error">
+                        ✗ No token found in localStorage
+                        <br><small>You need to login first</small>
+                    </div>
+                `;
+                showSolutions('no-token');
+            } else {
+                const tokenPreview = token.substring(0, 50) + '...';
+                statusDiv.innerHTML = `
+                    <div class="status success">
+                        ✓ Token found!
+                        <br><small>Token preview: ${tokenPreview}</small>
+                        <br><small>Token length: ${token.length} characters</small>
+                    </div>
+                `;
+                
+                // Try to decode JWT
+                try {
+                    const parts = token.split('.');
+                    if (parts.length === 3) {
+                        const payload = JSON.parse(atob(parts[1]));
+                        const exp = payload.exp ? new Date(payload.exp * 1000) : null;
+                        const now = new Date();
+                        
+                        if (exp && exp < now) {
+                            statusDiv.innerHTML += `
+                                <div class="status warning">
+                                    ⚠ Token is expired!
+                                    <br><small>Expired at: ${exp.toLocaleString()}</small>
+                                </div>
+                            `;
+                            showSolutions('expired-token');
+                        } else {
+                            statusDiv.innerHTML += `
+                                <div class="status success">
+                                    ✓ Token is valid
+                                    ${exp ? `<br><small>Expires at: ${exp.toLocaleString()}</small>` : ''}
+                                </div>
+                            `;
+                        }
+                    }
+                } catch (e) {
+                    statusDiv.innerHTML += `
+                        <div class="status warning">
+                            ⚠ Token format might be invalid
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function checkAllStorage() {
+            const statusDiv = document.getElementById('storageStatus');
+            const allKeys = Object.keys(localStorage);
+            
+            if (allKeys.length === 0) {
+                statusDiv.innerHTML = `
+                    <div class="status warning">
+                        ⚠ LocalStorage is empty
+                    </div>
+                `;
+            } else {
+                let html = '<div class="status info">Found ' + allKeys.length + ' items in localStorage:</div>';
+                html += '<pre>';
+                allKeys.forEach(key => {
+                    const value = localStorage.getItem(key);
+                    const preview = value.length > 100 ? value.substring(0, 100) + '...' : value;
+                    html += `${key}: ${preview}\n`;
+                });
+                html += '</pre>';
+                statusDiv.innerHTML = html;
+            }
+        }
+
+        async function testAPI() {
+            const statusDiv = document.getElementById('apiStatus');
+            const token = localStorage.getItem('token');
+            
+            statusDiv.innerHTML = '<div class="status info">Testing backend connection...</div>';
+            
+            try {
+                const response = await fetch('http://localhost:8080/api/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    statusDiv.innerHTML = `
+                        <div class="status success">
+                            ✓ Backend connection successful!
+                            <br><small>User: ${data.email || data.companyName}</small>
+                            <br><small>Phone: ${data.phoneNumber || 'Not set'}</small>
+                        </div>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else if (response.status === 401) {
+                    statusDiv.innerHTML = `
+                        <div class="status error">
+                            ✗ 401 Unauthorized
+                            <br><small>Token is invalid or expired</small>
+                        </div>
+                    `;
+                    showSolutions('invalid-token');
+                } else {
+                    statusDiv.innerHTML = `
+                        <div class="status error">
+                            ✗ Backend error: ${response.status}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="status error">
+                        ✗ Cannot connect to backend
+                        <br><small>${error.message}</small>
+                        <br><small>Make sure backend is running on http://localhost:8080</small>
+                    </div>
+                `;
+                showSolutions('backend-down');
+            }
+        }
+
+        function setManualToken() {
+            const token = document.getElementById('manualToken').value.trim();
+            if (token) {
+                localStorage.setItem('token', token);
+                alert('Token set successfully! Now check token status again.');
+                checkToken();
+            } else {
+                alert('Please enter a token');
+            }
+        }
+
+        function clearToken() {
+            localStorage.removeItem('token');
+            alert('Token cleared!');
+            checkToken();
+        }
+
+        function showSolutions(issue) {
+            const solutionsDiv = document.getElementById('solutions');
+            let html = '';
+            
+            if (issue === 'no-token') {
+                html = `
+                    <div class="status error">
+                        <strong>Problem: No token found</strong>
+                        <br><br>
+                        <strong>Solutions:</strong>
+                        <ol>
+                            <li>Login to your application first</li>
+                            <li>Make sure your login component saves the token:
+                                <pre>localStorage.setItem('token', response.data.token);</pre>
+                            </li>
+                            <li>Check if you're using the correct key name ('token')</li>
+                        </ol>
+                    </div>
+                `;
+            } else if (issue === 'expired-token') {
+                html = `
+                    <div class="status warning">
+                        <strong>Problem: Token expired</strong>
+                        <br><br>
+                        <strong>Solutions:</strong>
+                        <ol>
+                            <li>Clear localStorage and login again:
+                                <pre>localStorage.clear();</pre>
+                            </li>
+                            <li>Or just click the "Clear Token" button above and login again</li>
+                        </ol>
+                    </div>
+                `;
+            } else if (issue === 'invalid-token') {
+                html = `
+                    <div class="status error">
+                        <strong>Problem: Invalid token</strong>
+                        <br><br>
+                        <strong>Solutions:</strong>
+                        <ol>
+                            <li>Clear localStorage and login again</li>
+                            <li>Check if backend is using the same secret key</li>
+                            <li>Verify token format is correct (should be JWT)</li>
+                        </ol>
+                    </div>
+                `;
+            } else if (issue === 'backend-down') {
+                html = `
+                    <div class="status error">
+                        <strong>Problem: Cannot connect to backend</strong>
+                        <br><br>
+                        <strong>Solutions:</strong>
+                        <ol>
+                            <li>Start the backend server:
+                                <pre>cd omoiservespare
+mvnw spring-boot:run</pre>
+                            </li>
+                            <li>Check if backend is running on http://localhost:8080</li>
+                            <li>Check for CORS errors in browser console</li>
+                        </ol>
+                    </div>
+                `;
+            }
+            
+            solutionsDiv.innerHTML = html;
+        }
+
+        // Auto-check on page load
+        window.onload = function() {
+            checkToken();
+        };
+    </script>
+</body>
+</html>

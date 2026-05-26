@@ -1,0 +1,57 @@
+========================================
+QUICK START: Apply Feedback Admin Update
+========================================
+
+STEP 1: Copy the Updated Code
+------------------------------
+Open: App_Feedback_UPDATED.jsx
+Copy: All content (Ctrl+A, Ctrl+C)
+
+STEP 2: Replace Your File
+--------------------------
+Open: Your actual App_Feedback.jsx in your React project
+Delete: All existing content
+Paste: The copied content from App_Feedback_UPDATED.jsx
+Save: The file
+
+STEP 3: Verify Token Key
+-------------------------
+Check line 11 in the updated file:
+  const token = localStorage.getItem("token");
+
+If your app uses a different key (like "authToken" or "jwt"),
+change "token" to match your key.
+
+STEP 4: Test It
+---------------
+1. Make sure backend is running (port 8080)
+2. Start your React app (npm run dev)
+3. Login as: nikita.a@omoikaneinnovations.com
+4. Navigate to the feedback admin page
+5. You should see your 2 feedback entries!
+
+EXPECTED RESULT:
+----------------
+✓ Table shows 2 feedback entries
+✓ Both have rating: 3 stars
+✓ Both have status: NEW
+✓ User: nikita.a@omoikaneinnovations.com
+✓ Company: Omoiservespare Pvt Ltd
+✓ Download CSV button works
+✓ Download Excel button works
+✓ Mark Reviewed button appears
+
+TROUBLESHOOTING:
+----------------
+Problem: No data showing
+Fix: Open browser console (F12), check for errors
+
+Problem: "Access denied"
+Fix: Make sure you're logged in as PROFESSIONAL user
+
+Problem: Network error
+Fix: Verify backend is running on port 8080
+
+========================================
+That's it! Your feedback admin is ready!
+========================================

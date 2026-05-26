@@ -1,0 +1,359 @@
+# 🎨 Unified Auth System - Visual Diagrams
+
+## System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         FRONTEND (React)                         │
+│                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐ │
+│  │ Login Page   │  │ Signup Page  │  │  Protected Routes    │ │
+│  │              │  │              │  │                      │ │
+│  │ - Email      │  │ - Email      │  │ - Check Auth         │ │
+│  │ - Password   │  │ - Password   │  │ - Check Role         │ │
+│  │ - Submit     │  │ - Company    │  │ - Redirect           │ │
+│  └──────┬───────┘  │ - Phone      │  └──────────────────────┘ │
+│         │          │ - Role       │                            │
+│         │          └──────┬───────┘                            │
+│         │                 │                                     │
+│         └─────────────────┴─────────────────┐                  │
+│                                              │                  │
+│                        ┌─────────────────────▼────────────────┐│
+│                        │      authApi.js (Utility)            ││
+│                        │  - login()                           ││
+│                        │  - signup()                          ││
+│                        │  - logout()                          ││
+│                        │  - isAuthenticated()                 ││
+│                        │  - getUserRole()                     ││
+│                        └─────────────────────┬────────────────┘│
+└──────────────────────────────────────────────┼──────────────────┘
+                                               │
+                                    HTTP/JSON (JWT Token)
+                                               │
+┌──────────────────────────────────────────────▼──────────────────┐
+│                    BACKEND (Spring Boot)                         │
+│                                                                  │
+│  ┌──────────────────────────────────────────────────────────┐  │
+│  │         UnifiedAuthController                             │  │
+│  │  /api/v2/auth/login    - POST                            │  │
+│  │  /api/v2/auth/signup   - POST                            │  │
+│  └─────────────────────────┬────────────────────────────────┘  │
+│                            │                                    │
+│  ┌─────────────────────────▼────────────────────────────────┐  │
+│  │         UnifiedAuthService                                │  │
+│  │  - Validate credentials                                   │  │
+│  │  - Hash passwords (BCrypt)                                │  │
+│  │  - Generate JWT tokens                                    │  │
+│  │  - Check account status                                   │  │
+│  │  - Validate vendor status                                 │  │
+│  └─────────────────────────┬────────────────────────────────┘  │
+│                            │                                    │
+│  ┌─────────────────────────▼────────────────────────────────┐  │
+│  │         SecurityConfig                                    │  │
+│  │  - PasswordEncoder (BCrypt)                               │  │
+│  │  - JWT Filter                                             │  │
+│  │  - CORS Configuration                                     │  │
+│  │  - Public/Protected Endpoints                             │  │
+│  └─────────────────────────┬────────────────────────────────┘  │
+│                            │                                    │
+│  ┌─────────────────────────▼────────────────────────────────┐  │
+│  │         UserRepository (JPA)                              │  │
+│  │  - findByEmail()                                          │  │
+│  │  - save()                                                 │  │
+│  │  - countByRole()                                          │  │
+│  └─────────────────────────┬────────────────────────────────┘  │
+└────────────────────────────┼──────────────────────────────────┘
+                             │
+┌────────────────────────────▼──────────────────────────────────┐
+│                  DATABASE (PostgreSQL)                         │
+│                                                                │
+│  ┌──────────────────────────────────────────────────────────┐ │
+│  │  users                                                    │ │
+│  │  ├─ id (PK)                                               │ │
+│  │  ├─ email (UNIQUE)                                        │ │
+│  │  ├─ password_hash (BCrypt)                                │ │
+│  │  ├─ company_name                                          │ │
+│  │  ├─ phone_number                                          │ │
+│  │  ├─ role (USER, VENDOR, ADMIN)                            │ │
+│  │  ├─ vendor_status (PENDING, APPROVED, REJECTED, etc.)     │ │
+│  │  ├─ account_active (BOOLEAN)                              │ │
+│  │  ├─ created_at                                            │ │
+│  │  └─ updated_at                                            │ │
+│  └──────────────────────────────────────────────────────────┘ │
+└───────────────────────────────────────────────────────────────┘
+```
+
+## Login Flow
+
+```
+┌─────────┐
+│  USER   │
+└────┬────┘
+     │ 1. Enter email + password
+     ▼
+┌─────────────────┐
+│  Login Form     │
+└────┬────────────┘
+     │ 2. Submit
+     ▼
+┌─────────────────┐
+│  authApi.login()│
+└────┬────────────┘
+     │ 3. POST /api/v2/auth/login
+     ▼
+┌─────────────────────────┐
+│  UnifiedAuthController  │
+└────┬────────────────────┘
+     │ 4. Validate request
+     ▼
+┌─────────────────────────┐
+│  UnifiedAuthService     │
+│  ├─ Find user by email  │
+│  ├─ Verify password     │
+│  ├─ Check account status│
+│  ├─ Check vendor status │
+│  └─ Generate JWT token  │
+└────┬────────────────────┘
+     │ 5. Return token + user info
+     ▼
+┌─────────────────┐
+│  Frontend       │
+│  ├─ Store token │
+│  ├─ Store role  │
+│  └─ Redirect    │
+└────┬────────────┘
+     │ 6. Navigate based on role
+     ▼
+┌─────────────────┐
+│  Dashboard      │
+│  (Role-based)   │
+└─────────────────┘
+```
+
+## Signup Flow
+
+```
+┌─────────┐
+│  USER   │
+└────┬────┘
+     │ 1. Fill signup form
+     ▼
+┌─────────────────────────┐
+│  Signup Form            │
+│  ├─ Email               │
+│  ├─ Password            │
+│  ├─ Company Name        │
+│  ├─ Phone Number        │
+│  └─ Role (USER/VENDOR)  │
+└────┬────────────────────┘
+     │ 2. Submit
+     ▼
+┌─────────────────┐
+│  authApi.signup()│
+└────┬────────────┘
+     │ 3. POST /api/v2/auth/signup
+     ▼
+┌─────────────────────────┐
+│  UnifiedAuthController  │
+└────┬────────────────────┘
+     │ 4. Validate request
+     ▼
+┌─────────────────────────┐
+│  UnifiedAuthService     │
+│  ├─ Check email exists  │
+│  ├─ Hash password       │
+│  ├─ Create user         │
+│  ├─ Set vendor status   │
+│  └─ Generate JWT token  │
+└────┬────────────────────┘
+     │ 5. Save to database
+     ▼
+┌─────────────────┐
+│  PostgreSQL     │
+│  users table    │
+└────┬────────────┘
+     │ 6. Return token + user info
+     ▼
+┌─────────────────┐
+│  Frontend       │
+│  ├─ Store token │
+│  ├─ Store role  │
+│  └─ Redirect    │
+└────┬────────────┘
+     │ 7. Navigate based on role
+     ▼
+┌─────────────────────────┐
+│  Dashboard / Pending    │
+│  (Based on status)      │
+└─────────────────────────┘
+```
+
+## Role-Based Access Flow
+
+```
+┌─────────────────┐
+│  API Request    │
+│  + JWT Token    │
+└────┬────────────┘
+     │
+     ▼
+┌─────────────────────────┐
+│  JWT Filter             │
+│  ├─ Extract token       │
+│  ├─ Validate signature  │
+│  ├─ Check expiration    │
+│  └─ Extract role        │
+└────┬────────────────────┘
+     │
+     ├─────────────┬─────────────┬─────────────┐
+     │             │             │             │
+     ▼             ▼             ▼             ▼
+┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐
+│  USER   │  │ VENDOR  │  │  ADMIN  │  │ INVALID │
+│  Role   │  │  Role   │  │  Role   │  │  Token  │
+└────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘
+     │            │            │            │
+     │            ▼            │            ▼
+     │       ┌─────────┐      │       ┌─────────┐
+     │       │ Check   │      │       │  401    │
+     │       │ Vendor  │      │       │  Error  │
+     │       │ Status  │      │       └─────────┘
+     │       └────┬────┘      │
+     │            │            │
+     ▼            ▼            ▼
+┌─────────────────────────────────┐
+│  Authorized Access              │
+│  ├─ USER: User features         │
+│  ├─ VENDOR: Vendor dashboard    │
+│  └─ ADMIN: Admin panel          │
+└─────────────────────────────────┘
+```
+
+## Vendor Approval Workflow
+
+```
+┌─────────────────┐
+│  Vendor Signup  │
+└────┬────────────┘
+     │
+     ▼
+┌─────────────────────────┐
+│  Status: PENDING        │
+│  ├─ Can login           │
+│  ├─ Limited access      │
+│  └─ Awaiting approval   │
+└────┬────────────────────┘
+     │
+     ▼
+┌─────────────────────────┐
+│  Admin Reviews          │
+│  ├─ View application    │
+│  ├─ Check details       │
+│  └─ Make decision       │
+└────┬────────────────────┘
+     │
+     ├──────────────┬──────────────┐
+     │              │              │
+     ▼              ▼              ▼
+┌─────────┐   ┌─────────┐   ┌─────────┐
+│APPROVED │   │REJECTED │   │SUSPENDED│
+└────┬────┘   └────┬────┘   └────┬────┘
+     │             │              │
+     ▼             ▼              ▼
+┌─────────┐   ┌─────────┐   ┌─────────┐
+│  Full   │   │   No    │   │   No    │
+│ Access  │   │ Access  │   │ Access  │
+└─────────┘   └─────────┘   └─────────┘
+```
+
+## Security Layers
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Security Layers                       │
+│                                                          │
+│  Layer 1: HTTPS (Production)                            │
+│  ├─ Encrypted communication                             │
+│  └─ SSL/TLS certificates                                │
+│                                                          │
+│  Layer 2: CORS                                          │
+│  ├─ Allowed origins                                     │
+│  ├─ Allowed methods                                     │
+│  └─ Allowed headers                                     │
+│                                                          │
+│  Layer 3: JWT Authentication                            │
+│  ├─ Token validation                                    │
+│  ├─ Signature verification                              │
+│  └─ Expiration check                                    │
+│                                                          │
+│  Layer 4: Role-Based Authorization                      │
+│  ├─ Role validation                                     │
+│  ├─ Permission checks                                   │
+│  └─ Resource access control                             │
+│                                                          │
+│  Layer 5: Account Status                                │
+│  ├─ Active/Suspended check                              │
+│  ├─ Vendor approval status                              │
+│  └─ Account verification                                │
+│                                                          │
+│  Layer 6: Password Security                             │
+│  ├─ BCrypt hashing                                      │
+│  ├─ Salt generation                                     │
+│  └─ Secure storage                                      │
+│                                                          │
+│  Layer 7: Database Security                             │
+│  ├─ Prepared statements                                 │
+│  ├─ SQL injection prevention                            │
+│  └─ Data encryption                                     │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Data Flow
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                    Login Request                          │
+│  {                                                        │
+│    "email": "user@example.com",                          │
+│    "password": "password123"                             │
+│  }                                                        │
+└────┬─────────────────────────────────────────────────────┘
+     │
+     ▼
+┌──────────────────────────────────────────────────────────┐
+│                    Backend Processing                     │
+│  1. Find user by email                                   │
+│  2. Compare: BCrypt(password) == stored_hash             │
+│  3. Check: account_active == true                        │
+│  4. Check: vendor_status (if VENDOR)                     │
+│  5. Generate: JWT(email, role, expiry)                   │
+└────┬─────────────────────────────────────────────────────┘
+     │
+     ▼
+┌──────────────────────────────────────────────────────────┐
+│                    Login Response                         │
+│  {                                                        │
+│    "success": true,                                       │
+│    "message": "Login successful",                        │
+│    "accessToken": "eyJhbGciOiJIUzI1NiIs...",             │
+│    "user": {                                             │
+│      "id": 1,                                            │
+│      "email": "user@example.com",                        │
+│      "role": "USER",                                     │
+│      "accountActive": true                               │
+│    }                                                      │
+│  }                                                        │
+└────┬─────────────────────────────────────────────────────┘
+     │
+     ▼
+┌──────────────────────────────────────────────────────────┐
+│                    Frontend Storage                       │
+│  localStorage.setItem("accessToken", token)              │
+│  localStorage.setItem("userRole", role)                  │
+│  localStorage.setItem("userEmail", email)                │
+└──────────────────────────────────────────────────────────┘
+```
+
+---
+
+**Visual guide to understand the unified authentication system** 🎨

@@ -1,0 +1,23 @@
+===============================================
+QUICK FIX - RUN THIS COMMAND NOW
+===============================================
+
+Open PowerShell and run this ONE command:
+
+cd C:\Users\nikhi\Downloads\Lata_Backend\OmoiServespare\omoiservespare ; taskkill /F /IM java.exe ; Start-Sleep -Seconds 3 ; .\mvnw spring-boot:run
+
+This will:
+1. Navigate to the correct directory
+2. Kill the process blocking port 8080
+3. Wait 3 seconds
+4. Start your backend
+
+===============================================
+AFTER BACKEND STARTS
+===============================================
+
+1. Open: COMPLETE_FIX_GUIDE.md
+2. Follow STEP 2 to fix frontend files
+3. Test the complete system
+
+===============================================
