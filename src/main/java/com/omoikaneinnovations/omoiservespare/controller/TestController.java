@@ -19,9 +19,9 @@ public class TestController {
     public ResponseEntity<String> testEmailConfig() {
         boolean isValid = emailTestService.testEmailConnection();
         if (isValid) {
-            return ResponseEntity.ok("SendGrid configuration is valid");
+            return ResponseEntity.ok("SMTP email configuration is valid");
         } else {
-            return ResponseEntity.badRequest().body("SendGrid configuration failed");
+            return ResponseEntity.badRequest().body("SMTP email configuration failed");
         }
     }
 

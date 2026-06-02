@@ -16,29 +16,28 @@ import java.util.UUID;
 public class JwtUtil {
 
     /**
-     * 🔐 JWT Secret from application.properties / Render env
+     * JWT Secret from application.properties
      */
-    @Value("${jwt.secret}")
+    @Value("${jwt.secret:MyVeryStrongSecretKeyForJwtAuthentication256BitsLong12345}")
     private String secretKey;
 
     /**
-     * ⏱ Access token validity
+     * Access token validity
      */
-    private static final long ACCESS_TOKEN_EXPIRATION = 1000L * 60 * 60 * 24; // 24 hours
+    private static final long ACCESS_TOKEN_EXPIRATION =
+            1000L * 60 * 60 * 24; // 24 hours
 
-    /*
-     * =========================
-     * GET SIGNING KEY
-     * =========================
+    /**
+     * Get signing key
      */
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
+        return Keys.hmacShaKeyFor(
+                secretKey.getBytes(StandardCharsets.UTF_8)
+        );
     }
 
-    /*
-     * =========================
-     * GENERATE ACCESS TOKEN
-     * =========================
+    /**
+     * Generate access token
      */
     public String generateToken(String email, AccountType accountType) {
 
@@ -47,69 +46,78 @@ public class JwtUtil {
                 .claim("accountType", accountType)
                 .setIssuedAt(new Date())
                 .setExpiration(
-                        new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION))
+                        new Date(
+                                System.currentTimeMillis()
+                                        + ACCESS_TOKEN_EXPIRATION
+                        )
+                )
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
     /**
-     * 🔐 Generate token with role (RBAC)
+     * Generate token with role
      */
-    public String generateTokenWithRole(String email, String role, AccountType accountType) {
+    public String generateTokenWithRole(
+            String email,
+            String role,
+            AccountType accountType
+    ) {
+
         return Jwts.builder()
                 .setSubject(email)
                 .claim("role", role)
                 .claim("accountType", accountType)
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + ACCESS_TOKEN_EXPIRATION))
+                .setExpiration(
+                        new Date(
+                                System.currentTimeMillis()
+                                        + ACCESS_TOKEN_EXPIRATION
+                        )
+                )
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    /*
-     * =========================
-     * EXTRACT EMAIL
-     * =========================
+    /**
+     * Extract email
      */
     public String extractEmail(String token) {
         return getClaims(token).getSubject();
     }
 
-    /*
-     * =========================
-     * EXTRACT ROLE
-     * =========================
+    /**
+     * Extract account type
      */
-
     public String extractAccountType(String token) {
-        return getClaims(token).get("accountType", String.class);
+        return getClaims(token)
+                .get("accountType", String.class);
     }
 
     /**
-     * Extract role from token (RBAC)
+     * Extract role
      */
     public String extractRole(String token) {
-        return getClaims(token).get("role", String.class);
+        return getClaims(token)
+                .get("role", String.class);
     }
 
-    /*
-     * =========================
-     * VALIDATE TOKEN
-     * =========================
+    /**
+     * Validate token
      */
     public boolean validateToken(String token) {
+
         try {
-            getClaims(token); // verifies signature + expiry
+            getClaims(token);
             return true;
+
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
     }
 
-    /*
-     * =========================
-     * PARSE CLAIMS
-     * =========================
+    /**
+     * Parse claims
      */
     private Claims getClaims(String token) {
 
@@ -120,10 +128,8 @@ public class JwtUtil {
                 .getBody();
     }
 
-    /*
-     * =========================
-     * REFRESH TOKEN
-     * =========================
+    /**
+     * Generate refresh token
      */
     public String generateRefreshToken() {
         return UUID.randomUUID().toString();

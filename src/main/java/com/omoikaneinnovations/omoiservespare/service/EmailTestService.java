@@ -1,113 +1,61 @@
 package com.omoikaneinnovations.omoiservespare.service;
 
-import com.sendgrid.Method;
-import com.sendgrid.Request;
-import com.sendgrid.Response;
-import com.sendgrid.SendGrid;
-import com.sendgrid.helpers.mail.Mail;
-import com.sendgrid.helpers.mail.objects.Content;
-import com.sendgrid.helpers.mail.objects.Email;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class EmailTestService {
 
-    private static final Logger logger = LoggerFactory.getLogger(EmailTestService.class);
+    private final JavaMailSender mailSender;
 
-    @Value("${sendgrid.api.key}")
-    private String sendGridApiKey;
-
-    @Value("${sendgrid.from.email}")
+    @Value("${mail.from}")
     private String fromEmail;
 
     public boolean testEmailConnection() {
+
         try {
-            logger.info("Testing SendGrid connection...");
-            logger.info("API Key: {}...{}", 
-                sendGridApiKey.substring(0, 10), 
-                sendGridApiKey.substring(sendGridApiKey.length() - 10));
-            logger.info("From Email: {}", fromEmail);
 
-            Email from = new Email(fromEmail);
-            Email to = new Email("test@example.com"); // Test email
-            String subject = "SendGrid Connection Test";
+            log.info("SMTP configuration loaded successfully");
+            log.info("From Email: {}", fromEmail);
 
-            Content content = new Content(
-                    "text/plain",
-                    "This is a test email to verify SendGrid configuration."
-            );
-
-            Mail mail = new Mail(from, subject, to, content);
-            SendGrid sg = new SendGrid(sendGridApiKey);
-
-            Request request = new Request();
-            request.setMethod(Method.POST);
-            request.setEndpoint("mail/send");
-            request.setBody(mail.build());
-            
-            // Just test the connection, don't actually send
-            logger.info("SendGrid configuration appears valid");
-            logger.info("Mail object created successfully");
-            
             return true;
+
         } catch (Exception e) {
-            logger.error("SendGrid configuration test failed", e);
+
+            log.error("SMTP configuration test failed", e);
             return false;
         }
     }
 
     public void sendTestOtp(String toEmail, String otp) {
+
         try {
-            logger.info("=== SENDING TEST OTP EMAIL ===");
-            logger.info("To: {}", toEmail);
-            logger.info("OTP: {}", otp);
-            logger.info("From: {}", fromEmail);
-            logger.info("API Key: {}...{}", 
-                sendGridApiKey.substring(0, 10), 
-                sendGridApiKey.substring(sendGridApiKey.length() - 10));
 
-            Email from = new Email(fromEmail);
-            Email to = new Email(toEmail);
-            String subject = "Your Login OTP - Test";
+            SimpleMailMessage message = new SimpleMailMessage();
 
-            Content content = new Content(
-                    "text/plain",
+            message.setFrom(fromEmail);
+            message.setTo(toEmail);
+            message.setSubject("Test OTP Email");
+
+            message.setText(
                     "Your OTP is: " + otp +
                     "\n\nThis OTP is valid for 5 minutes." +
-                    "\n\nThis is a test email from your application." +
-                    "\n\nIf you did not request this, please ignore."
+                    "\n\nThis is a test email."
             );
 
-            Mail mail = new Mail(from, subject, to, content);
-            SendGrid sg = new SendGrid(sendGridApiKey);
+            mailSender.send(message);
 
-            Request request = new Request();
-            request.setMethod(Method.POST);
-            request.setEndpoint("mail/send");
-            request.setBody(mail.build());
-            
-            logger.info("Sending email request to SendGrid...");
-            Response response = sg.api(request);
-            
-            logger.info("SendGrid Response Status: {}", response.getStatusCode());
-            logger.info("SendGrid Response Body: {}", response.getBody());
-            logger.info("SendGrid Response Headers: {}", response.getHeaders());
-            
-            if (response.getStatusCode() >= 200 && response.getStatusCode() < 300) {
-                logger.info("✅ TEST EMAIL SENT SUCCESSFULLY!");
-            } else {
-                logger.error("❌ TEST EMAIL FAILED - Status: {}, Body: {}", 
-                    response.getStatusCode(), response.getBody());
-            }
-        } catch (IOException e) {
-            logger.error("❌ IOException sending test email", e);
+            log.info("Test email sent successfully to {}", toEmail);
+
         } catch (Exception e) {
-            logger.error("❌ Unexpected error sending test email", e);
+
+            log.error("Failed to send test email", e);
         }
     }
 }

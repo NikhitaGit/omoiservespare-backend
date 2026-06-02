@@ -13,6 +13,7 @@ function getDeviceId() {
 
 const api = axios.create({
   baseURL: 'http://localhost:8080',
+  timeout: 60000, // 60 seconds timeout for email operations
   headers: {
     'Content-Type': 'application/json',
   },
