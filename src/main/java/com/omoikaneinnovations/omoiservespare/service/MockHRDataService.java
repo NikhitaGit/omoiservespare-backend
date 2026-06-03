@@ -82,7 +82,7 @@ public class MockHRDataService {
             "EMP003",
             "Rahul",
             "Sharma",
-            "rahul.sharma@omoikaneinnovations.com",
+            "bd@omoikaneinnovations.com",
             "Engineering",
             "Engineering Manager",
             "+91-9876543212",
@@ -96,7 +96,7 @@ public class MockHRDataService {
             "EMP004",
             "Priya",
             "Patel",
-            "priya.patel@omoikaneinnovations.com",
+            "info@omoikaneinnovations.com",
             "Product",
             "Product Manager",
             "+91-9876543213",
@@ -108,9 +108,9 @@ public class MockHRDataService {
 
         addEmployee(createEmployee(
             "EMP005",
-            "Amit",
-            "Kumar",
-            "amit.kumar@omoikaneinnovations.com",
+            "Vishnu",
+            "Vardhan",
+            "vishnuvardhan.a@omoikaneinnovations.com",
             "Engineering",
             "DevOps Engineer",
             "+91-9876543214",
@@ -123,9 +123,9 @@ public class MockHRDataService {
         // Company 2: Omoikane Innovations
         addEmployee(createEmployee(
             "EMP101",
-            "John",
-            "Doe",
-            "john.doe@omoikaneinnovations.com",
+            "Aishwarya",
+            "N",
+            "aishwarya.n@omoikaneinnovations.com",
             "Engineering",
             "Software Engineer",
             "+91-9876543220",
@@ -137,9 +137,9 @@ public class MockHRDataService {
 
         addEmployee(createEmployee(
             "EMP102",
-            "Jane",
-            "Smith",
-            "jane.smith@omoikaneinnovations.com",
+            "Mahesh",
+            "Panchal",
+            "mahesh.p@omoikaneinnovations.com",
             "Design",
             "UI/UX Designer",
             "+91-9876543221",
