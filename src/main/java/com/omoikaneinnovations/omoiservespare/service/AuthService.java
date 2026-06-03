@@ -172,12 +172,23 @@ public class AuthService {
         System.out.println("⏰ EXPIRES AT: " + otp.getExpiresAt());
         System.out.println("===========================================");
 
-        // Send email asynchronously (won't block)
-        emailService.sendOtpEmail(email, otpValue);
+        // Send email SYNCHRONOUSLY (errors will show in logs immediately)
+        logger.info("Calling emailService.sendOtpEmail() for: {}", email);
+        try {
+            emailService.sendOtpEmail(email, otpValue);
+            logger.info("✅ Email service call completed successfully");
+        } catch (Exception e) {
+            logger.error("❌ EMAIL SENDING FAILED: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to send OTP email: " + e.getMessage(), e);
+        }
 
-        // Send SMS asynchronously (won't block)
+        // Send SMS (optional)
         if (phoneNumber != null && !phoneNumber.isBlank()) {
-            smsService.sendOtpSms(phoneNumber, otpValue);
+            try {
+                smsService.sendOtpSms(phoneNumber, otpValue);
+            } catch (Exception e) {
+                logger.warn("SMS sending failed (non-critical): {}", e.getMessage());
+            }
         }
     }
 

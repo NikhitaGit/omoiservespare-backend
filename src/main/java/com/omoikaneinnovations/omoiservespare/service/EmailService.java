@@ -8,7 +8,6 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.retry.annotation.Backoff;
 import org.springframework.retry.annotation.Retryable;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import jakarta.mail.MessagingException;
@@ -47,7 +46,7 @@ public class EmailService {
      * 🔐 Send OTP Email with Professional Template
      * 
      * Features:
-     * - Async execution (non-blocking)
+     * - SYNCHRONOUS execution (shows errors immediately in logs)
      * - Auto-retry on failure (3 attempts)
      * - HTML formatted email
      * - Production-grade error handling
@@ -55,7 +54,7 @@ public class EmailService {
      * @param toEmail Recipient email address
      * @param otp 4-digit OTP code
      */
-    @Async
+    // REMOVED @Async to make errors visible in production logs
     @Retryable(
         retryFor = {MailException.class, MessagingException.class},
         maxAttempts = MAX_RETRY_ATTEMPTS,
