@@ -2,10 +2,25 @@
 
 ## What Was Fixed
 
-✅ Redis configuration now uses environment variables  
-✅ Redis is now OPTIONAL (disabled by default)  
+✅ **Redis**: Made optional (disabled by default)  
+✅ **Vault**: Disabled for production deployment  
 ✅ Cart works with in-memory storage when Redis unavailable  
+✅ Email uses direct env vars instead of Vault  
 ✅ Application will start successfully on Render  
+
+---
+
+## Changes Summary
+
+### 1. Redis Configuration (RedisConfig.java)
+- Now uses environment variables
+- Disabled by default (`spring.redis.enabled=false`)
+- Cart falls back to in-memory storage
+
+### 2. Vault Configuration
+- **OmoiservespareApplication.java**: Excluded Vault autoconfiguration
+- **application.properties**: Added `spring.cloud.vault.enabled=false`
+- Email credentials now from direct env vars
 
 ---
 
