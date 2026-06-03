@@ -29,7 +29,15 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174"}, allowCredentials = "true")
+@CrossOrigin(
+    origins = {
+        "https://lata-frontend-flame.vercel.app",
+        "https://lata-frontend-git-main-omoi-servespare-s-projects.vercel.app",
+        "http://localhost:5173",
+        "http://localhost:5174"
+    },
+    allowCredentials = "true"
+)
 public class UnifiedAuthController {
     
     private final ProductionAuthService authService;
