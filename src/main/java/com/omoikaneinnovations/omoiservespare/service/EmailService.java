@@ -51,6 +51,11 @@ log.info("JavaMailSender class: {}", mailSender.getClass().getName());
             helper.setSubject("Your OTP Code - OmoiServeSpare");
             helper.setText(buildOtpEmailHtml(otp), true); // true = HTML
             
+            log.info("SMTP Host: {}", "smtp.gmail.com");
+            log.info("SMTP Username Loaded: {}", System.getenv("SENDER_USERNAME") != null);
+log.info("SMTP Password Loaded: {}", System.getenv("SENDER_PASSWORD") != null);
+log.info("From Address: {}", fromAddress);
+log.info("From Name: {}", fromName);
             mailSender.send(message);
             
             log.info("✅ OTP email sent successfully to: {}", toEmail);
