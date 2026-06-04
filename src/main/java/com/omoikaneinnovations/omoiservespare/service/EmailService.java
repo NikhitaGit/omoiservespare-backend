@@ -32,10 +32,17 @@ public class EmailService {
      * @param toEmail User's email address
      * @param otp Generated OTP code
      */
+
+
     public void sendOtpEmail(String toEmail, String otp) {
         try {
             log.info("📧 Sending OTP email to: {}", toEmail);
             
+            log.info("SMTP USERNAME: {}", fromAddress);
+log.info("FROM NAME: {}", fromName);
+
+log.info("JavaMailSender class: {}", mailSender.getClass().getName());
+
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             
