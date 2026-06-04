@@ -1,31 +1,27 @@
 package com.omoikaneinnovations.omoiservespare.service;
 
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import com.resend.Resend;
+import com.resend.services.emails.model.CreateEmailOptions;
+import com.resend.services.emails.model.CreateEmailResponse;
 import org.springframework.stereotype.Service;
+
 
 @Service
 public class EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
+ 
+    private final Resend resend;
 
-    private final JavaMailSender mailSender;
+      public EmailService(Resend resend) {
+    this.resend = resend;
+}
 
-    @Value("${email.from.address}")
-    private String fromAddress;
 
-    @Value("${email.from.name}")
-    private String fromName;
-
-    public EmailService(JavaMailSender mailSender) {
-        this.mailSender = mailSender;
-    }
-
+    
     /**
      * Send OTP email to user
      * 
@@ -34,49 +30,36 @@ public class EmailService {
      */
 
 
-    public void sendOtpEmail(String toEmail, String otp) {
-        try {
-            log.info("📧 Sending OTP email to: {}", toEmail);
-            
-            log.info("SMTP USERNAME: {}", fromAddress);
-log.info("FROM NAME: {}", fromName);
+public void sendOtpEmail(String toEmail, String otp) {
 
-log.info("JavaMailSender class: {}", mailSender.getClass().getName());
+    try {
 
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            
-            helper.setFrom(fromAddress, fromName);
-            helper.setTo(toEmail);
-            helper.setSubject("Your OTP Code - OmoiServeSpare");
-            helper.setText(buildOtpEmailHtml(otp), true); // true = HTML
-            
-            log.info("SMTP Host: {}", "smtp.gmail.com");
-            log.info("SMTP Username Loaded: {}", System.getenv("SENDER_USERNAME") != null);
-log.info("SMTP Password Loaded: {}", System.getenv("SENDER_PASSWORD") != null);
-log.info("From Address: {}", fromAddress);
-log.info("From Name: {}", fromName);
-            mailSender.send(message);
-            
-            log.info("✅ OTP email sent successfully to: {}", toEmail);
-            
-        } catch (MessagingException e) {
-            log.error("❌ Failed to send OTP email to: {}", toEmail, e);
-            // Fallback: Log OTP to console in case of email failure
-            log.warn("========================================");
-            log.warn("  FALLBACK OTP for {}: {}", toEmail, otp);
-            log.warn("========================================");
-            throw new RuntimeException("Failed to send OTP email", e);
-        } catch (Exception e) {
-            log.error("❌ Unexpected error sending OTP email to: {}", toEmail, e);
-            // Fallback: Log OTP to console
-            log.warn("========================================");
-            log.warn("  FALLBACK OTP for {}: {}", toEmail, otp);
-            log.warn("========================================");
-            // throw new RuntimeException("Failed to send OTP email", e);
-            return;
-        }
+        log.info("Sending OTP via Resend to {}", toEmail);
+
+        CreateEmailOptions params =
+                CreateEmailOptions.builder()
+                        .from("onboarding@resend.dev")
+                        .to(toEmail)
+                        .subject("Your OTP Code - OmoiServeSpare")
+                        .html(buildOtpEmailHtml(otp))
+                        .build();
+
+        CreateEmailResponse response =
+                resend.emails().send(params);
+
+        log.info("OTP Email Sent Successfully");
+        log.info("Response: {}", response);
+
+    } catch (Exception e) {
+
+        log.error("Failed to send OTP email", e);
+
+        throw new RuntimeException(
+                "Failed to send OTP email",
+                e
+        );
     }
+}
 
     /**
      * Build professional HTML email template for OTP
@@ -185,25 +168,26 @@ log.info("From Name: {}", fromName);
      * @param subject Email subject
      * @param body Email body (HTML)
      */
-    public void sendEmail(String toEmail, String subject, String body) {
-        try {
-            log.info("📧 Sending email to: {}, Subject: {}", toEmail, subject);
+    // public void sendEmail(String toEmail, String subject, String body) {
+    //     try {
+    //         log.info("📧 Sending email to: {}, Subject: {}", toEmail, subject);
             
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+    //         MimeMessage message = mailSender.createMimeMessage();
+    //         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             
-            helper.setFrom(fromAddress, fromName);
-            helper.setTo(toEmail);
-            helper.setSubject(subject);
-            helper.setText(body, true); // true = HTML
+    //         helper.setFrom(fromAddress, fromName);
+    //         helper.setTo(toEmail);
+    //         helper.setSubject(subject);
+    //         helper.setText(body, true); // true = HTML
             
-            mailSender.send(message);
+    //         mailSender.send(message);
             
-            log.info("✅ Email sent successfully to: {}", toEmail);
+    //         log.info("✅ Email sent successfully to: {}", toEmail);
             
-        } catch (Exception e) {
-            log.error("❌ Failed to send email to: {}", toEmail, e);
-            throw new RuntimeException("Failed to send email", e);
-        }
-    }
+    //     } catch (Exception e) {
+    //         log.error("❌ Failed to send email to: {}", toEmail, e);
+    //         throw new RuntimeException("Failed to send email", e);
+    //     }
+
 }
+
