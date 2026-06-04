@@ -82,6 +82,7 @@ public class SecurityConfig {
         config.setAllowedOrigins(List.of(
                 "https://lata-frontend-flame.vercel.app",
                 "https://lata-frontend-git-main-omoi-servespare-s-projects.vercel.app",
+                "http://localhost:5173",
                 "http://localhost:5174",
                 "http://localhost:3000"
         ));

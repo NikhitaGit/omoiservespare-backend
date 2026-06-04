@@ -1,223 +1,158 @@
 package com.omoikaneinnovations.omoiservespare.service;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.MailException;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
-import org.springframework.scheduling.annotation.Async;
-import org.springframework.stereotype.Service;
-
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.stereotype.Service;
 
-/**
- * 📧 Production-Grade Email Service
- * 
- * Features:
- * - Professional HTML email templates
- * - Automatic retry on failure (3 attempts with exponential backoff)
- * - Comprehensive logging and error tracking
- * - Async processing (non-blocking)
- * - SMTP-based email delivery
- * - Security best practices
- * 
- * Configuration: Uses SMTP settings from application.properties
- */
 @Service
-@RequiredArgsConstructor
-@Slf4j
 public class EmailService {
+
+    private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
     private final JavaMailSender mailSender;
 
-    @Value("${spring.mail.username}")
-    private String fromEmail;
-    
-    private static final String COMPANY_NAME = "OmoiServespare";
-    private static final int OTP_VALIDITY_MINUTES = 5;
-    private static final int MAX_RETRY_ATTEMPTS = 3;
+    @Value("${email.from.address}")
+    private String fromAddress;
+
+    @Value("${email.from.name}")
+    private String fromName;
+
+    public EmailService(JavaMailSender mailSender) {
+        this.mailSender = mailSender;
+    }
 
     /**
-     * 🔐 Send OTP Email with Professional Template
+     * Send OTP email to user
      * 
-     * Features:
-     * - Async execution (non-blocking)
-     * - Auto-retry on failure (3 attempts)
-     * - HTML formatted email
-     * - Production-grade error handling
-     * 
-     * @param toEmail Recipient email address
-     * @param otp 4-digit OTP code
+     * @param toEmail User's email address
+     * @param otp Generated OTP code
      */
-    @Async
-    @Retryable(
-        retryFor = {MailException.class, MessagingException.class},
-        maxAttempts = MAX_RETRY_ATTEMPTS,
-        backoff = @Backoff(delay = 2000, multiplier = 2)
-    )
     public void sendOtpEmail(String toEmail, String otp) {
-        
-        long startTime = System.currentTimeMillis();
-        
-        log.info("========================================");
-        log.info("📧 EMAIL SERVICE: OTP Send Initiated");
-        log.info("Recipient: {}", toEmail);
-        log.info("OTP: {}", otp);
-        log.info("Timestamp: {}", LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-        log.info("========================================");
-
         try {
-            // Create MIME message
+            log.info("📧 Sending OTP email to: {}", toEmail);
+            
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-            // Set email headers
-            helper.setFrom(fromEmail, COMPANY_NAME);
-            helper.setTo(toEmail);
-            helper.setSubject("🔐 Your Login OTP - " + COMPANY_NAME);
             
-            // Generate HTML email content
-            String htmlContent = generateOtpEmailHtml(otp, toEmail);
-            helper.setText(htmlContent, true); // true = isHtml
-
-            // Send email
-            log.info("Sending email via SMTP...");
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(toEmail);
+            helper.setSubject("Your OTP Code - OmoiServeSpare");
+            helper.setText(buildOtpEmailHtml(otp), true); // true = HTML
+            
             mailSender.send(message);
             
-            long duration = System.currentTimeMillis() - startTime;
-            
-            log.info("========================================");
-            log.info("✅ EMAIL SENT SUCCESSFULLY");
-            log.info("Recipient: {}", toEmail);
-            log.info("Duration: {} ms", duration);
-            log.info("SMTP Server: {}", fromEmail);
-            log.info("========================================");
-
-        } catch (MailException e) {
-            log.error("========================================");
-            log.error("❌ SMTP MAIL EXCEPTION");
-            log.error("Recipient: {}", toEmail);
-            log.error("Error Type: {}", e.getClass().getSimpleName());
-            log.error("Error Message: {}", e.getMessage());
-            log.error("========================================");
-            log.error("Full Stack Trace:", e);
-            throw e; // Rethrow to trigger retry
+            log.info("✅ OTP email sent successfully to: {}", toEmail);
             
         } catch (MessagingException e) {
-            log.error("========================================");
-            log.error("❌ MESSAGING EXCEPTION");
-            log.error("Recipient: {}", toEmail);
-            log.error("Error Type: {}", e.getClass().getSimpleName());
-            log.error("Error Message: {}", e.getMessage());
-            log.error("========================================");
-            log.error("Full Stack Trace:", e);
-            throw new RuntimeException("Email sending failed", e); // Wrap to trigger retry
-            
+            log.error("❌ Failed to send OTP email to: {}", toEmail, e);
+            // Fallback: Log OTP to console in case of email failure
+            log.warn("========================================");
+            log.warn("  FALLBACK OTP for {}: {}", toEmail, otp);
+            log.warn("========================================");
+            throw new RuntimeException("Failed to send OTP email", e);
         } catch (Exception e) {
-            log.error("========================================");
-            log.error("❌ UNEXPECTED EMAIL ERROR");
-            log.error("Recipient: {}", toEmail);
-            log.error("Error Type: {}", e.getClass().getSimpleName());
-            log.error("Error Message: {}", e.getMessage());
-            log.error("========================================");
-            log.error("Full Stack Trace:", e);
-            throw new RuntimeException("Unexpected email error", e);
+            log.error("❌ Unexpected error sending OTP email to: {}", toEmail, e);
+            // Fallback: Log OTP to console
+            log.warn("========================================");
+            log.warn("  FALLBACK OTP for {}: {}", toEmail, otp);
+            log.warn("========================================");
+            throw new RuntimeException("Failed to send OTP email", e);
         }
     }
 
     /**
-     * 🎨 Generate Professional HTML Email Template
+     * Build professional HTML email template for OTP
      * 
-     * Features:
-     * - Responsive design
-     * - Modern styling
-     * - Clear call-to-action
-     * - Security warnings
-     * - Professional branding
+     * @param otp The OTP code to display
+     * @return HTML email content
      */
-    private String generateOtpEmailHtml(String otp, String recipientEmail) {
-        String currentTime = LocalDateTime.now()
-                .format(DateTimeFormatter.ofPattern("MMM dd, yyyy hh:mm a"));
-        
+    private String buildOtpEmailHtml(String otp) {
         return """
             <!DOCTYPE html>
             <html lang="en">
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Your Login OTP</title>
+                <title>Your OTP Code</title>
             </head>
             <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
-                <table role="presentation" style="width: 100%%; border-collapse: collapse;">
+                <table width="100%%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
                     <tr>
-                        <td align="center" style="padding: 40px 0;">
-                            <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <td align="center">
+                            <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                                 
                                 <!-- Header -->
                                 <tr>
-                                    <td style="padding: 40px 40px 20px 40px; text-align: center; background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); border-radius: 8px 8px 0 0;">
-                                        <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: bold;">🔐 Security Verification</h1>
+                                    <td style="background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); padding: 40px 20px; text-align: center;">
+                                        <h1 style="margin: 0; color: #06c9ffff; font-size: 28px; font-weight: bold;">
+                                            🍽️ OmoiServeSpare
+                                        </h1>
+                                        <p style="margin: 10px 0 0 0; color: #0cbcd0ff; font-size: 14px; opacity: 0.9;">
+                                            Your Food Ordering Platform
+                                        </p>
                                     </td>
                                 </tr>
                                 
-                                <!-- Body -->
+                                <!-- Content -->
                                 <tr>
-                                    <td style="padding: 40px;">
-                                        <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #333333;">
-                                            Hello,
-                                        </p>
+                                    <td style="padding: 40px 30px;">
+                                        <h2 style="margin: 0 0 20px 0; color: #333333; font-size: 24px; text-align: center;">
+                                            Verify Your Email
+                                        </h2>
                                         
-                                        <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #333333;">
-                                            We received a login request for your <strong>%s</strong> account. Use the verification code below to complete your login:
+                                        <p style="margin: 0 0 30px 0; color: #666666; font-size: 16px; line-height: 1.5; text-align: center;">
+                                            Use the following One-Time Password (OTP) to complete your login:
                                         </p>
                                         
                                         <!-- OTP Box -->
-                                        <table role="presentation" style="width: 100%%; margin: 30px 0;">
-                                            <tr>
-                                                <td align="center">
-                                                    <div style="background-color: #f8f9fa; border: 2px dashed #667eea; border-radius: 8px; padding: 20px; display: inline-block;">
-                                                        <p style="margin: 0 0 10px 0; font-size: 14px; color: #666666; text-transform: uppercase; letter-spacing: 1px;">Your OTP Code</p>
-                                                        <p style="margin: 0; font-size: 36px; font-weight: bold; color: #667eea; letter-spacing: 8px; font-family: 'Courier New', monospace;">%s</p>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </table>
+                                        <div style="background: linear-gradient(135deg, #4CAF50 0%%, #2196F3 100%%); border: 3px solid #1976D2; border-radius: 12px; padding: 30px; text-align: center; margin: 0 0 30px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                                            <div style="font-size: 48px; font-weight: bold; color: #FFFFFF; letter-spacing: 12px; font-family: 'Courier New', monospace; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); background-color: rgba(0,0,0,0.2); padding: 20px; border-radius: 8px; display: inline-block;">
+                                                %s
+                                            </div>
+                                        </div>
                                         
-                                        <!-- Important Info -->
-                                        <table role="presentation" style="width: 100%%; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; margin: 20px 0;">
-                                            <tr>
-                                                <td style="padding: 15px;">
-                                                    <p style="margin: 0; font-size: 14px; color: #856404;">
-                                                        ⚠️ <strong>Important:</strong> This code expires in <strong>%d minutes</strong>. Do not share this code with anyone.
-                                                    </p>
-                                                </td>
-                                            </tr>
-                                        </table>
+                                        <!-- Warning -->
+                                        <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 0 0 20px 0; border-radius: 4px;">
+                                            <p style="margin: 0; color: #856404; font-size: 14px; line-height: 1.5;">
+                                                ⚠️ <strong>Security Notice:</strong> This OTP is valid for <strong>5 minutes</strong> only. Do not share this code with anyone.
+                                            </p>
+                                        </div>
                                         
-                                        <p style="margin: 20px 0 0 0; font-size: 14px; line-height: 1.6; color: #666666;">
-                                            If you didn't request this code, please ignore this email. Your account remains secure.
+                                        <p style="margin: 0 0 20px 0; color: #666666; font-size: 14px; line-height: 1.5; text-align: center;">
+                                            If you didn't request this OTP, please ignore this email or contact our support team.
                                         </p>
+                                        
+                                        <!-- Button -->
+                                        <div style="text-align: center; margin: 30px 0;">
+                                            <a href="#" style="display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+                                                Return to App
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                                 
                                 <!-- Footer -->
                                 <tr>
-                                    <td style="padding: 30px 40px; background-color: #f8f9fa; border-radius: 0 0 8px 8px; border-top: 1px solid #e9ecef;">
-                                        <p style="margin: 0 0 10px 0; font-size: 14px; color: #666666; text-align: center;">
-                                            Sent to: <strong>%s</strong>
+                                    <td style="background-color: #cb00f8ff; padding: 30px; text-align: center; border-top: 1px solid #e9ecef;">
+                                        <p style="margin: 0 0 10px 0; color: #6c757d; font-size: 14px;">
+                                            <strong>OmoiServeSpare</strong> - Your Campus Food Ordering Platform
                                         </p>
-                                        <p style="margin: 0 0 10px 0; font-size: 12px; color: #999999; text-align: center;">
-                                            Time: %s
+                                        <p style="margin: 0 0 10px 0; color: #6c757d; font-size: 12px;">
+                                            📧 support@omoiservespare.com | 📱 +91 1234567890
                                         </p>
-                                        <p style="margin: 0; font-size: 12px; color: #999999; text-align: center;">
-                                            © 2024 %s. All rights reserved.
+                                        <p style="margin: 0; color: #adb5bd; font-size: 11px;">
+                                            © 2026 OmoiServeSpare. All rights reserved.
                                         </p>
+                                        <div style="margin-top: 15px;">
+                                            <a href="#" style="color: #6c757d; text-decoration: none; margin: 0 10px; font-size: 12px;">Privacy Policy</a>
+                                            <a href="#" style="color: #6c757d; text-decoration: none; margin: 0 10px; font-size: 12px;">Terms of Service</a>
+                                            <a href="#" style="color: #6c757d; text-decoration: none; margin: 0 10px; font-size: 12px;">Help Center</a>
+                                        </div>
                                     </td>
                                 </tr>
                                 
@@ -227,40 +162,35 @@ public class EmailService {
                 </table>
             </body>
             </html>
-            """.formatted(
-                COMPANY_NAME,
-                otp,
-                OTP_VALIDITY_MINUTES,
-                recipientEmail,
-                currentTime,
-                COMPANY_NAME
-            );
+            """.formatted(otp);
     }
-    
+
     /**
-     * 📊 Email Service Health Check
+     * Send a generic email (for future use)
      * 
-     * @return true if email service is configured properly
+     * @param toEmail Recipient email
+     * @param subject Email subject
+     * @param body Email body (HTML)
      */
-    public boolean isEmailServiceHealthy() {
+    public void sendEmail(String toEmail, String subject, String body) {
         try {
-            if (fromEmail == null || fromEmail.isEmpty()) {
-                log.error("Email service not configured: fromEmail is null or empty");
-                return false;
-            }
+            log.info("📧 Sending email to: {}, Subject: {}", toEmail, subject);
             
-            if (mailSender == null) {
-                log.error("Email service not configured: mailSender is null");
-                return false;
-            }
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
             
-            log.info("✅ Email service health check passed");
-            log.info("Configured sender: {}", fromEmail);
-            return true;
+            helper.setFrom(fromAddress, fromName);
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(body, true); // true = HTML
+            
+            mailSender.send(message);
+            
+            log.info("✅ Email sent successfully to: {}", toEmail);
             
         } catch (Exception e) {
-            log.error("❌ Email service health check failed", e);
-            return false;
+            log.error("❌ Failed to send email to: {}", toEmail, e);
+            throw new RuntimeException("Failed to send email", e);
         }
     }
 }
