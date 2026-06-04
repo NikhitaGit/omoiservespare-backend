@@ -61,7 +61,8 @@ public class EmailService {
             log.warn("========================================");
             log.warn("  FALLBACK OTP for {}: {}", toEmail, otp);
             log.warn("========================================");
-            throw new RuntimeException("Failed to send OTP email", e);
+            // throw new RuntimeException("Failed to send OTP email", e);
+            return;
         }
     }
 

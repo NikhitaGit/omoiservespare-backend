@@ -173,12 +173,28 @@ public class AuthService {
         System.out.println("===========================================");
 
         // Send email asynchronously (won't block)
-        emailService.sendOtpEmail(email, otpValue);
+        // emailService.sendOtpEmail(email, otpValue);
 
         // Send SMS asynchronously (won't block)
-        if (phoneNumber != null && !phoneNumber.isBlank()) {
-            smsService.sendOtpSms(phoneNumber, otpValue);
-        }
+        // if (phoneNumber != null && !phoneNumber.isBlank()) {
+        //     smsService.sendOtpSms(phoneNumber, otpValue);
+        // }
+
+        // Try email but don't fail OTP flow
+try {
+    emailService.sendOtpEmail(email, otpValue);
+} catch (Exception e) {
+    logger.error("Email delivery failed, continuing OTP flow", e);
+}
+
+// Try SMS independently
+try {
+    if (phoneNumber != null && !phoneNumber.isBlank()) {
+        smsService.sendOtpSms(phoneNumber, otpValue);
+    }
+} catch (Exception e) {
+    logger.error("SMS delivery failed", e);
+}
     }
 
     @Transactional
