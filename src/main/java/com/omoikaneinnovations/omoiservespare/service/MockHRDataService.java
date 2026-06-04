@@ -82,7 +82,7 @@ public class MockHRDataService {
             "EMP003",
             "Rahul",
             "Sharma",
-            "bd@omoikaneinnovations.com",
+            "nikhitaadigannavar14@gmail.com",
             "Engineering",
             "Engineering Manager",
             "+91-9876543212",
