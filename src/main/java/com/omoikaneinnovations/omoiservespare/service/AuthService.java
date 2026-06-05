@@ -182,7 +182,7 @@ public class AuthService {
 
         // Try email but don't fail OTP flow
 try {
-    emailService.sendOtpEmail(email, otpValue);
+    emailService.sendOtp(email, otpValue);
 } catch (Exception e) {
     logger.error("Email delivery failed, continuing OTP flow", e);
 }
