@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Reset OTP</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7fa;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        .email-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .email-header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .email-header p {
+            margin: 10px 0 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+        .email-body {
+            padding: 40px 30px;
+        }
+        .email-body p {
+            color: #333333;
+            font-size: 16px;
+            line-height: 1.6;
+            margin: 0 0 20px;
+        }
+        .otp-container {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            margin: 30px 0;
+        }
+        .otp-label {
+            color: #666666;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+        }
+        .otp-code {
+            font-size: 42px;
+            font-weight: 700;
+            color: #667eea;
+            letter-spacing: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+        }
+        .otp-validity {
+            color: #999999;
+            font-size: 13px;
+            margin-top: 15px;
+        }
+        .warning-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px 20px;
+            margin: 25px 0;
+            border-radius: 4px;
+        }
+        .warning-box p {
+            color: #856404;
+            font-size: 14px;
+            margin: 0;
+        }
+        .email-footer {
+            background-color: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+        }
+        .email-footer p {
+            color: #6c757d;
+            font-size: 13px;
+            margin: 5px 0;
+        }
+        .company-name {
+            color: #667eea;
+            font-weight: 600;
+        }
+        .divider {
+            height: 1px;
+            background: linear-gradient(to right, transparent, #e0e0e0, transparent);
+            margin: 30px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="email-header">
+            <h1>🔐 Password Reset Request</h1>
+            <p>HRMS - Human Resource Management System</p>
+        </div>
+
+        <!-- Body -->
+        <div class="email-body">
+            <p>Hello,</p>
+            
+            <p>We received a request to reset your password for your HRMS account (<strong th:text="${email}">user@example.com</strong>).</p>
+            
+            <p>Use the following One-Time Password (OTP) to reset your password:</p>
+
+            <!-- OTP Display -->
+            <div class="otp-container">
+                <div class="otp-label">Your OTP Code</div>
+                <div class="otp-code" th:text="${otp}">1234</div>
+                <div class="otp-validity">⏱️ Valid for 10 minutes</div>
+            </div>
+
+            <p>Enter this OTP on the password reset page to continue.</p>
+
+            <div class="divider"></div>
+
+            <!-- Warning -->
+            <div class="warning-box">
+                <p><strong>⚠️ Security Notice:</strong> If you didn't request this password reset, please ignore this email or contact your HR administrator immediately. Your account is secure.</p>
+            </div>
+
+            <p style="margin-top: 30px;">For security reasons, this OTP will expire in <strong>10 minutes</strong>.</p>
+        </div>
+
+        <!-- Footer -->
+        <div class="email-footer">
+            <p><span class="company-name">Omoi HR Works</span></p>
+            <p>Human Resource Management System</p>
+            <p style="margin-top: 15px;">This is an automated email. Please do not reply to this message.</p>
+            <p style="color: #999999; font-size: 12px; margin-top: 10px;">
+                © 2026 Omoi Innovations. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>
