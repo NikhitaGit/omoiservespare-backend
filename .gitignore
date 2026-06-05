@@ -31,7 +31,16 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Environment Variables & Secrets
 .env
+.env.local
+.env.production
+*.env
+
+# SendGrid API Keys (NEVER COMMIT)
+sendgrid.key
+sendgrid-*.key
 
 # Logs
 *.log
