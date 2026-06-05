@@ -23,7 +23,7 @@ public class EmailService {
     @Value("${sendgrid.from.email}")
     private String fromEmail;
     
-    @Value("${sendgrid.from.name:HRMS Team}")
+    @Value("${sendgrid.from.name:OmoiServespare}")
     private String fromName;
 
     @Async
@@ -127,10 +127,10 @@ public class EmailService {
                                     <td style="padding: 30px; background-color: #f8f9fa; text-align: center; border-top: 1px solid #e9ecef;">
                                         <p style="margin: 0 0 10px; color: #666666; font-size: 14px;">
                                             Best regards,<br>
-                                            <strong>HRMS Authentication Team</strong>
+                                            <strong>OmoiServespare Team</strong>
                                         </p>
                                         <p style="margin: 10px 0 0; color: #999999; font-size: 12px;">
-                                            © 2026 HRMS. All rights reserved.
+                                            © 2026 OmoiServespare. All rights reserved.
                                         </p>
                                     </td>
                                 </tr>
