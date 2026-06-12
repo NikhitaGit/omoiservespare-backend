@@ -13,6 +13,6 @@ public class PaymentVerifyRequestDTO {
     private String razorpayPaymentId;
     private String razorpayOrderId;
     private String signature;
-    private String cavv;
-    private String eci;
+    private String cavv; // 3D Secure
+    private String eci;  // 3D Secure
 }

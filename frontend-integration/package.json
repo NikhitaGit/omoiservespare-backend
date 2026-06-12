@@ -1,0 +1,31 @@
+﻿{
+  "name": "omoi-servespare-frontend",
+  "version": "1.0.0",
+  "description": "Frontend dependencies for real-time location system",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "axios": "^1.6.2",
+    
+    "// Google Maps": "",
+    "@react-google-maps/api": "^2.19.2",
+    "@googlemaps/js-api-loader": "^1.16.2",
+    
+    "// WebSocket": "",
+    "sockjs-client": "^1.6.1",
+    "@stomp/stompjs": "^7.0.0",
+    
+    "// Icons": "",
+    "react-icons": "^4.12.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.0.8"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  }
+}

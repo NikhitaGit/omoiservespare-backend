@@ -1,0 +1,32 @@
+====================================================================
+COPY AND PASTE THIS INTO POWERSHELL (NOT CMD)
+====================================================================
+
+Open PowerShell and run this command:
+
+$file = "src\main\java\com\omoikaneinnovations\omoiservespare\service\UnifiedAuthService.java"; $content = [System.IO.File]::ReadAllText($file); if ($content[0] -eq [char]0xFEFF) { $content = $content.Substring(1) }; $utf8 = New-Object System.Text.UTF8Encoding $false; [System.IO.File]::WriteAllText((Resolve-Path $file).Path, $content, $utf8); Write-Host "BOM removed!" -ForegroundColor Green; mvn clean compile -DskipTests
+
+====================================================================
+OR EASIER SOLUTION: OPEN THE FILE IN YOUR IDE
+====================================================================
+
+1. Open UnifiedAuthService.java in VS Code or IntelliJ
+2. Look at bottom right corner - it will say "UTF-8"  
+3. Click on it
+4. Select "Save with Encoding"
+5. Choose "UTF-8" (NOT "UTF-8 with BOM")
+6. Save the file
+7. Run: mvn clean spring-boot:run
+
+====================================================================
+WHY THIS HAPPENS
+====================================================================
+
+When I created the file using fsWrite, it may have been saved with
+a BOM character depending on your system's default encoding.
+
+The BOM (Byte Order Mark) is an invisible Unicode character (U+FEFF)
+that Windows sometimes adds to UTF-8 files. Java compiler doesn't 
+accept it.
+
+====================================================================

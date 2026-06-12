@@ -467,9 +467,10 @@ public class PaymentService {
         }
 
         // ============================================
-        // 4. UPDATE TRANSACTION STATUS
+        // 4. UPDATE TRANSACTION STATUS AND STORE PAYMENT ID
         // ============================================
         transaction.setStatus(PaymentStatus.SUCCESS);
+        transaction.setPaymentId(razorpayPaymentId); // Store the payment ID for refunds
         transaction.setUpdatedAt(LocalDateTime.now());
         paymentRepo.save(transaction);
 
@@ -553,9 +554,24 @@ public class PaymentService {
 
     /**
      * STEP 3: Process Refund (for cancelled canteen orders)
+     * 
+     * ⚠️ DEPRECATED: This method directly sets RefundStatus.SUCCESS without going through
+     * the proper workflow (PENDING → APPROVED → PROCESSING → SUCCESS)
+     * 
+     * Use ProductionRefundService.requestCancellation() instead for:
+     * - Proper status tracking
+     * - Vendor approval workflow
+     * - Audit logging
+     * - Retry mechanism
+     * - Webhook integration
+     * 
+     * @deprecated Use {@link ProductionRefundService#requestCancellation(RefundRequestDTO, User)} instead
      */
+    @Deprecated
     @Transactional
     public void refundCanteenOrder(Long canteenOrderId, String reason) {
+        log.info("🔄 Starting refund process for canteen order: {}", canteenOrderId);
+        
         CanteenOrder canteenOrder = canteenOrderRepo.findById(canteenOrderId)
                 .orElseThrow(() -> new PaymentException("CANTEEN_ORDER_NOT_FOUND", "Canteen order not found"));
 
@@ -564,44 +580,107 @@ public class PaymentService {
                 .orElseThrow(() -> new PaymentException("PAYMENT_NOT_FOUND", "Payment transaction not found"));
 
         // ============================================
-        // 1. CALL RAZORPAY REFUND API
+        // 1. VALIDATE PAYMENT ID EXISTS
         // ============================================
-        Long amountInPaise = canteenOrder.getSubtotal().multiply(BigDecimal.valueOf(100)).longValue();
+        if (transaction.getPaymentId() == null || transaction.getPaymentId().isEmpty()) {
+            log.error("❌ Payment ID not found for order: {}", order.getOrderCode());
+            throw new PaymentException("PAYMENT_ID_NOT_FOUND", 
+                "Payment ID not found - payment may not have been completed successfully");
+        }
+
+        log.info("✅ Payment ID found: {}", transaction.getPaymentId());
+
+        // ============================================
+        // 2. CALCULATE REFUND AMOUNTS (INCLUDING GST)
+        // ============================================
+        BigDecimal subtotal = canteenOrder.getSubtotal();
+        BigDecimal cgst = subtotal.multiply(new BigDecimal("0.025")).setScale(2, java.math.RoundingMode.HALF_UP);
+        BigDecimal sgst = subtotal.multiply(new BigDecimal("0.025")).setScale(2, java.math.RoundingMode.HALF_UP);
+        BigDecimal totalRefund = subtotal.add(cgst).add(sgst);
+        
+        log.info("💰 Refund calculation - Subtotal: {}, CGST: {}, SGST: {}, Total: {}", 
+            subtotal, cgst, sgst, totalRefund);
+
+        // ============================================
+        // 3. CALL RAZORPAY REFUND API
+        // ============================================
+        Long amountInPaise = totalRefund.multiply(BigDecimal.valueOf(100)).longValue();
+        
+        log.info("🔄 Calling Razorpay refund API - Payment ID: {}, Amount: {} paise", 
+            transaction.getPaymentId(), amountInPaise);
+        
         Map<String, Object> refundResponse = razorpayService.refundPayment(
-                transaction.getTransactionId(),
+                transaction.getPaymentId(), // Use payment ID, not order ID
                 amountInPaise,
                 reason);
 
         String refundId = (String) refundResponse.get("refund_id");
+        String razorpayStatus = (String) refundResponse.get("status");
+        
+        log.info("✅ Razorpay refund created - Refund ID: {}, Status: {}", refundId, razorpayStatus);
 
         // ============================================
-        // 2. CREATE REFUND RECORD
+        // 4. GENERATE INTERNAL REFUND CODE (REQUIRED FIELD!)
         // ============================================
-        RefundTransaction refund = new RefundTransaction();
-        refund.setPaymentTransaction(transaction);
-        refund.setCanteenOrder(canteenOrder);
-        refund.setRefundAmount(canteenOrder.getSubtotal());
-        refund.setRefundId(refundId);
-        refund.setStatus(PaymentStatus.SUCCESS);
-        refund.setReason(reason);
-        refund.setCreatedAt(LocalDateTime.now());
-
-        refundRepo.save(refund);
+        String internalRefundCode = "REF" + System.currentTimeMillis() + 
+            java.util.UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+        
+        log.info("📝 Generated internal refund code: {}", internalRefundCode);
 
         // ============================================
-        // 3. UPDATE CANTEEN ORDER
+        // 5. CREATE COMPLETE REFUND RECORD
+        // ============================================
+        RefundTransaction refund = RefundTransaction.builder()
+                .internalRefundCode(internalRefundCode) // ✅ REQUIRED FIELD
+                .refundId(refundId)
+                .paymentTransaction(transaction)
+                .canteenOrder(canteenOrder)
+                .order(order)
+                .customer(order.getCustomer()) // ✅ REQUIRED FOR QUERY
+                .originalAmount(subtotal)
+                .refundAmount(totalRefund)
+                .cgstAmount(cgst)
+                .sgstAmount(sgst)
+                .status(RefundStatus.SUCCESS)
+                .razorpayStatus(razorpayStatus)
+                .cancellationReason(reason)
+                .cancellationRequestedBy(com.omoikaneinnovations.omoiservespare.entity.CancellationRequestedBy.CUSTOMER)
+                .vendorApprovalStatus(com.omoikaneinnovations.omoiservespare.entity.VendorApprovalStatus.APPROVED)
+                .gatewayName("razorpay")
+                .refundMethod(transaction.getPaymentMethod())
+                .refundMode("AUTO")
+                .refundInitiatedAt(LocalDateTime.now())
+                .refundProcessedAt(LocalDateTime.now())
+                .createdBy("system")
+                .updatedBy("system")
+                .build();
+
+        RefundTransaction savedRefund = refundRepo.save(refund);
+        
+        log.info("✅ Refund record saved - ID: {}, Internal Code: {}", 
+            savedRefund.getId(), savedRefund.getInternalRefundCode());
+
+        // ============================================
+        // 6. UPDATE CANTEEN ORDER
         // ============================================
         canteenOrder.setRefunded(true);
+        canteenOrder.setRefundStatus("COMPLETED");
+        canteenOrder.setRefundCompletedAt(LocalDateTime.now());
         canteenOrderRepo.save(canteenOrder);
+        
+        log.info("✅ Canteen order updated - Refunded: true, Status: COMPLETED");
 
         // ============================================
-        // 4. ADJUST PARENT ORDER TOTAL
+        // 7. ADJUST PARENT ORDER TOTAL
         // ============================================
-        order.setTotalAmount(order.getTotalAmount().subtract(canteenOrder.getSubtotal()));
+        order.setTotalAmount(order.getTotalAmount().subtract(totalRefund));
+        order.setUpdatedAt(LocalDateTime.now());
         orderRepo.save(order);
+        
+        log.info("✅ Parent order total adjusted - New total: {}", order.getTotalAmount());
 
-        log.info("Refund processed - Canteen Order: {}, Refund ID: {}, Amount: {}", 
-            canteenOrderId, refundId, canteenOrder.getSubtotal());
+        log.info("✅✅✅ Refund process completed successfully - Canteen Order: {}, Refund ID: {}, Amount: {}", 
+            canteenOrderId, refundId, totalRefund);
     }
 
     // ============================================

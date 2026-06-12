@@ -1,9 +1,12 @@
 package com.omoikaneinnovations.omoiservespare.controller;
 
 import com.omoikaneinnovations.omoiservespare.service.PaymentService;
+import com.omoikaneinnovations.omoiservespare.service.ProductionRefundService;
 import com.omoikaneinnovations.omoiservespare.dto.PaymentRequestDTO;
 import com.omoikaneinnovations.omoiservespare.dto.PaymentInitResponseDTO;
 import com.omoikaneinnovations.omoiservespare.dto.PaymentVerifyRequestDTO;
+import com.omoikaneinnovations.omoiservespare.dto.RefundRequestDTO;
+import com.omoikaneinnovations.omoiservespare.dto.RefundResponseDTO;
 import com.omoikaneinnovations.omoiservespare.exception.PaymentException;
 import com.omoikaneinnovations.omoiservespare.exception.FraudDetectedException;
 import com.omoikaneinnovations.omoiservespare.entity.User;
@@ -25,6 +28,7 @@ import java.util.Map;
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final ProductionRefundService refundService;
     private final UserRepository userRepository;
 
     /**
@@ -245,36 +249,74 @@ public class PaymentController {
 
     /**
      * Refund Payment (for cancelled orders)
+     * 
+     * ⚠️ DEPRECATED: This endpoint now uses ProductionRefundService for proper workflow
+     * The refund will go through the complete lifecycle:
+     * PENDING → APPROVED → PROCESSING → SUCCESS
+     * 
+     * @deprecated Use /api/refunds/request-cancellation instead for full control
      */
+    @Deprecated
     @PostMapping("/refund/{canteenOrderId}")
     public ResponseEntity<?> refundPayment(
             @PathVariable Long canteenOrderId,
             @RequestParam String reason) {
 
         try {
-            paymentService.refundCanteenOrder(canteenOrderId, reason);
+            User user = getCurrentUser();
+            
+            log.info("🔄 Refund request received via legacy endpoint - Canteen Order: {}, User: {}", 
+                canteenOrderId, user.getEmail());
+            
+            // Create refund request using ProductionRefundService
+            RefundRequestDTO refundRequest = new RefundRequestDTO();
+            refundRequest.setCanteenOrderId(canteenOrderId);
+            refundRequest.setReason(reason);
+            refundRequest.setRequestedBy("CUSTOMER"); // Assuming customer initiated
+            
+            // Request cancellation via new service
+            RefundResponseDTO response = refundService.requestCancellation(refundRequest, user);
 
-            log.info("Refund processed - Canteen Order: {}", canteenOrderId);
+            log.info("✅ Refund processed via ProductionRefundService - Canteen Order: {}, Status: {}", 
+                canteenOrderId, response.getStatus());
 
             return ResponseEntity.ok(Map.of(
                     "status", "success",
-                    "message", "Refund processed successfully"
+                    "message", "Refund request processed successfully",
+                    "refundCode", response.getInternalRefundCode(),
+                    "refundStatus", response.getStatus(),
+                    "requiresApproval", response.getVendorApprovalStatus().equals("PENDING")
             ));
 
         } catch (PaymentException e) {
-            log.error("Refund failed - Error: {}", e.getErrorCode());
+            log.error("❌ Refund failed - Error: {}", e.getErrorCode());
             return ResponseEntity.status(400).body(Map.of(
                     "error", e.getErrorCode(),
                     "message", e.getErrorMessage()
             ));
 
         } catch (Exception e) {
-            log.error("Refund failed", e);
+            log.error("❌ Refund failed", e);
             return ResponseEntity.status(500).body(Map.of(
                     "error", "INTERNAL_ERROR",
                     "message", "Refund failed: " + e.getMessage()
             ));
         }
+    }
+    
+    /**
+     * Helper method to get current authenticated user
+     */
+    private User getCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        
+        if (auth == null || !auth.isAuthenticated()) {
+            throw new RuntimeException("Unauthenticated");
+        }
+        
+        String email = auth.getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
     // ============================================
@@ -287,17 +329,5 @@ public class PaymentController {
             return xForwardedFor.split(",")[0];
         }
         return request.getRemoteAddr();
-    }
-
-    private User getCurrentUser() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        
-        if (auth == null || !auth.isAuthenticated()) {
-            throw new RuntimeException("Unauthenticated");
-        }
-        
-        String email = auth.getName(); // email
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
     }
 }

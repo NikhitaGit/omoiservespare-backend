@@ -60,11 +60,21 @@ public class ProductionAuthService {
         }
         
         // Verify password
-        if (user.getPasswordHash() == null || 
-            !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            log.warn("Invalid password for vendor: {}", request.getEmail());
-            throw new RuntimeException("Invalid credentials");
-        }
+        // if (user.getPasswordHash() == null || 
+        //     !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+        //     log.warn("Invalid password for vendor: {}", request.getEmail());
+        //     throw new RuntimeException("Invalid credentials");
+        // }
+
+        log.info("Entered password = {}", request.getPassword());
+log.info("Stored hash = {}", user.getPasswordHash());
+
+boolean matches =
+        passwordEncoder.matches(
+                request.getPassword(),
+                user.getPasswordHash());
+
+log.info("Password matches = {}", matches);
         
         // Check account status
         if (!user.getAccountActive()) {

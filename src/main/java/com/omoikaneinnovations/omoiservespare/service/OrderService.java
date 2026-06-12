@@ -8,9 +8,12 @@ import com.omoikaneinnovations.omoiservespare.entity.PaymentStatus;
 import com.omoikaneinnovations.omoiservespare.entity.User;
 import com.omoikaneinnovations.omoiservespare.repository.MenuItemRepository;
 import com.omoikaneinnovations.omoiservespare.repository.OrderRepository;
+import com.omoikaneinnovations.omoiservespare.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import com.omoikaneinnovations.omoiservespare.repository.CanteenOrderRepository;
+import com.omoikaneinnovations.omoiservespare.dto.RefundRequestDTO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import java.util.Map;
 import org.springframework.stereotype.Service;
 import com.omoikaneinnovations.omoiservespare.dto.CanteenOrderDTO;
@@ -30,6 +33,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class OrderService {
 
     private final OrderRepository repo;
@@ -39,6 +43,8 @@ public class OrderService {
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final CanteenOrderRepository canteenOrderRepo;
     private final OrderCodeGeneratorService orderCodeGenerator;
+    private final ProductionRefundService refundService;
+    private final UserRepository userRepository;
 
     /*
      * ==============================
@@ -264,7 +270,10 @@ public class OrderService {
      * ACCEPT CANCELLATION
      * ==============================
      */
-    public CanteenOrder acceptCanteenCancellation(Long canteenOrderId) {
+    public CanteenOrder acceptCanteenCancellation(Long canteenOrderId, User vendor) {
+        log.info("========================================");
+        log.info("ACCEPT CANCELLATION CALLED - ID: {}", canteenOrderId);
+        log.info("========================================");
 
         CanteenOrder co = canteenOrderRepo.findById(canteenOrderId)
                 .orElseThrow(() -> new RuntimeException("Canteen order not found with ID: " + canteenOrderId));
@@ -274,22 +283,85 @@ public class OrderService {
                                      " but expected CANCELLATION_REQUESTED");
         }
 
-        co.setStatus(OrderStatus.CANCELLED);
-        co.setRefunded(true);
+        log.info("✅ Vendor accepted cancellation for canteen order: {}", canteenOrderId);
+        log.info("🔍 DEBUG: Vendor: {}", vendor.getEmail());
 
-        canteenOrderRepo.save(co);
+        Order parentOrder = co.getParentOrder();
+        String paymentMethod = parentOrder.getPaymentMethod();
+        PaymentStatus paymentStatus = parentOrder.getPaymentStatus();
 
-        // 🔥 Adjust parent order total
-        Order parent = co.getParentOrder();
+        log.info("📋 Order payment details - Method: {}, Status: {}", paymentMethod, paymentStatus);
 
-        parent.setTotalAmount(
-                parent.getTotalAmount().subtract(co.getSubtotal()));
+        // Check if this is a cash order or payment not completed
+        boolean isCashOrder = "CASH".equalsIgnoreCase(paymentMethod) || "COD".equalsIgnoreCase(paymentMethod);
+        boolean paymentNotCompleted = paymentStatus != PaymentStatus.SUCCESS;
 
-        repo.save(parent);
+        if (isCashOrder || paymentNotCompleted) {
+            // ✅ SIMPLE CANCELLATION (No refund needed for cash orders or unpaid orders)
+            log.info("💵 Cash order or payment not completed - Simple cancellation without refund");
+            
+            co.setStatus(OrderStatus.CANCELLED);
+            co.setRefunded(false);
+            co.setRefundStatus("NOT_APPLICABLE");
+            co = canteenOrderRepo.save(co);
+            
+            log.info("✅ Order cancelled successfully without refund processing");
+            
+        } else {
+            // ✅ ONLINE PAYMENT - Process refund using ProductionRefundService
+            log.info("💳 Online payment detected - Processing refund via Razorpay");
+            
+            try {
+                String reason = co.getCancelReason() != null ? co.getCancelReason() : "Vendor accepted cancellation";
+                
+                log.info("🔄 Processing refund via ProductionRefundService - Canteen Order: {}, Reason: {}", canteenOrderId, reason);
+                
+                // Create refund request DTO
+                RefundRequestDTO refundRequest = new RefundRequestDTO();
+                refundRequest.setCanteenOrderId(canteenOrderId);
+                refundRequest.setReason(reason);
+                refundRequest.setRequestedBy("VENDOR"); // Vendor is accepting cancellation - will auto-approve
+                
+                // Request cancellation - this will:
+                // 1. Auto-approve (vendor-initiated)
+                // 2. Process with Razorpay immediately  
+                // 3. Update canteen order status to CANCELLED
+                // 4. Create refund record with SUCCESS status
+                // 5. Adjust parent order total
+                refundService.requestCancellation(refundRequest, vendor);
+                
+                // Reload canteen order to get updated status
+                co = canteenOrderRepo.findById(canteenOrderId)
+                        .orElseThrow(() -> new RuntimeException("Canteen order not found"));
+                
+                log.info("✅ Refund processed successfully - Canteen Order: {}, Status: {}, RefundStatus: {}", 
+                    canteenOrderId, co.getStatus(), co.getRefundStatus());
+                
+            } catch (Exception e) {
+                log.error("❌ Refund processing failed for canteen order: {}", canteenOrderId, e);
+                log.error("❌ Exception: {}", e.getMessage(), e);
+                
+                // If refund fails, manually mark order as cancelled but refund failed
+                co.setStatus(OrderStatus.CANCELLED);
+                co.setRefunded(false);
+                co.setRefundStatus("FAILED");
+                co = canteenOrderRepo.save(co);
+                
+                log.warn("⚠️ Order cancelled but refund failed. Manual refund required.");
+                // Don't re-throw - allow the cancellation to proceed even if refund fails
+                // The order should still be cancelled for the vendor
+            }
+        }
 
+        // ✅ STEP 2: Publish updates via WebSocket
         publisher.toCanteen(String.valueOf(co.getCanteenId()), toCanteenDTO(co));
-        publisher.toCustomer(parent.getCustomer(), mapToDTO(parent));
-
+        
+        // Reload parent order to get fresh state
+        Order freshParent = repo.findById(parentOrder.getId())
+                .orElse(parentOrder);
+        publisher.toCustomer(freshParent.getCustomer(), mapToDTO(freshParent));
+        
+        log.info("✅ WebSocket notifications sent for order: {}", canteenOrderId);
         return co;
     }
 
@@ -299,7 +371,7 @@ public class OrderService {
      * + AUTO-RESUME AFTER DELAY
      * ==============================
      */
-    public CanteenOrder rejectCanteenCancellation(Long canteenOrderId) {
+    public CanteenOrder rejectCanteenCancellation(Long canteenOrderId, User vendor) {
 
         CanteenOrder co = canteenOrderRepo.findById(canteenOrderId)
                 .orElseThrow(() -> new RuntimeException("Canteen order not found with ID: " + canteenOrderId));
@@ -309,17 +381,25 @@ public class OrderService {
                                      " but expected CANCELLATION_REQUESTED");
         }
 
-        // 1️⃣ Set rejection status
-        co.setStatus(OrderStatus.CANCELLATION_REJECTED);
-        canteenOrderRepo.save(co);
+        log.info("❌ Vendor rejected cancellation for canteen order: {}", canteenOrderId);
+        log.info("🔍 DEBUG: Vendor: {}", vendor.getEmail());
 
+        // 1️⃣ Set rejection status (NOT CANCELLED - just REJECTED)
+        co.setStatus(OrderStatus.CANCELLATION_REJECTED);
+        co.setRefunded(false);
+        co.setRefundStatus("NOT_APPLICABLE");
+        co = canteenOrderRepo.save(co);
+
+        // 2️⃣ Send immediate WebSocket updates
         publisher.toCanteen(String.valueOf(co.getCanteenId()), toCanteenDTO(co));
         // Reload parent from DB so canteenOrders reflect the saved CANCELLATION_REJECTED status
         Order freshParent = repo.findById(co.getParentOrder().getId())
                 .orElse(co.getParentOrder());
         publisher.toCustomer(freshParent.getCustomer(), mapToDTO(freshParent));
 
-        // 2️⃣ Auto resume to PREPARING after delay
+        log.info("📤 WebSocket sent CANCELLATION_REJECTED status");
+
+        // 3️⃣ Auto resume to PREPARING after delay
         int DELAY_SECONDS = 5;
 
         scheduler.schedule(() -> {
@@ -328,21 +408,30 @@ public class OrderService {
                     .findById(canteenOrderId)
                     .orElse(null);
 
-            if (delayed == null)
+            if (delayed == null) {
+                log.warn("⚠️ Canteen order {} not found during auto-resume", canteenOrderId);
                 return;
+            }
 
-            if (delayed.getStatus() != OrderStatus.CANCELLATION_REJECTED)
+            // Only auto-resume if still in CANCELLATION_REJECTED status
+            if (delayed.getStatus() != OrderStatus.CANCELLATION_REJECTED) {
+                log.info("⚠️ Canteen order {} status changed to {}, skipping auto-resume", 
+                    canteenOrderId, delayed.getStatus());
                 return;
+            }
 
             delayed.setStatus(OrderStatus.PREPARING);
             delayed.setCancelReason(null);
 
             canteenOrderRepo.save(delayed);
 
+            log.info("🔄 Auto-resumed order {} to PREPARING", canteenOrderId);
+
             publisher.toCanteen(String.valueOf(delayed.getCanteenId()), toCanteenDTO(delayed));
             Order delayedParent = repo.findById(delayed.getParentOrder().getId()).orElse(null);
             if (delayedParent != null) {
                 publisher.toCustomer(delayedParent.getCustomer(), mapToDTO(delayedParent));
+                log.info("📤 WebSocket sent PREPARING status after auto-resume");
             }
 
         }, DELAY_SECONDS, TimeUnit.SECONDS);
@@ -372,6 +461,9 @@ public class OrderService {
      * ==============================
      */
     private void validateTransition(OrderStatus current, OrderStatus next) {
+        
+        // ✅ Add logging to see what's happening
+        log.info("🔍 Validating transition: {} → {}", current, next);
 
         if (current == OrderStatus.DELIVERED) {
             throw new RuntimeException("Order already delivered");
@@ -381,17 +473,27 @@ public class OrderService {
             throw new RuntimeException("Cancellation in progress");
         }
 
-        if (current == OrderStatus.ORDER_RECEIVED && next != OrderStatus.PREPARING)
-            throw new RuntimeException("Invalid transition");
+        if (current == OrderStatus.ORDER_RECEIVED && next != OrderStatus.PREPARING) {
+            log.error("❌ Invalid transition: Cannot go from ORDER_RECEIVED to {}", next);
+            throw new RuntimeException("Invalid transition: ORDER_RECEIVED can only go to PREPARING");
+        }
 
-        if (current == OrderStatus.PREPARING && next != OrderStatus.PREPARED)
-            throw new RuntimeException("Invalid transition");
+        if (current == OrderStatus.PREPARING && next != OrderStatus.PREPARED) {
+            log.error("❌ Invalid transition: Cannot go from PREPARING to {}", next);
+            throw new RuntimeException("Invalid transition: PREPARING can only go to PREPARED");
+        }
 
-        if (current == OrderStatus.CANCELLATION_REJECTED && next != OrderStatus.PREPARING)
-            throw new RuntimeException("Invalid transition");
+        if (current == OrderStatus.CANCELLATION_REJECTED && next != OrderStatus.PREPARING) {
+            log.error("❌ Invalid transition: Cannot go from CANCELLATION_REJECTED to {}", next);
+            throw new RuntimeException("Invalid transition: CANCELLATION_REJECTED can only go to PREPARING");
+        }
 
-        if (current == OrderStatus.PREPARED && next != OrderStatus.DELIVERED)
-            throw new RuntimeException("Invalid transition");
+        if (current == OrderStatus.PREPARED && next != OrderStatus.DELIVERED) {
+            log.error("❌ Invalid transition: Cannot go from PREPARED to {}", next);
+            throw new RuntimeException("Invalid transition: PREPARED can only go to DELIVERED");
+        }
+        
+        log.info("✅ Transition valid: {} → {}", current, next);
     }
 
     private CanteenOrderWebSocketDTO toCanteenDTO(CanteenOrder co) {
@@ -428,6 +530,9 @@ public class OrderService {
     private OrderResponseDTO mapToDTO(Order order) {
 
         List<CanteenOrderDTO> canteenDTOs = new ArrayList<>();
+        
+        // Calculate actual order total from canteen orders (ignoring refund reductions)
+        BigDecimal calculatedTotal = BigDecimal.ZERO;
 
         if (order.getCanteenOrders() != null) {
             for (CanteenOrder co : order.getCanteenOrders()) {
@@ -445,6 +550,13 @@ public class OrderService {
                                         .build());
                     }
                 }
+                
+                // Add this canteen order's total (subtotal + GST) to the calculated total
+                BigDecimal subtotal = co.getSubtotal();
+                BigDecimal cgst = subtotal.multiply(new BigDecimal("0.025")).setScale(2, java.math.RoundingMode.HALF_UP);
+                BigDecimal sgst = subtotal.multiply(new BigDecimal("0.025")).setScale(2, java.math.RoundingMode.HALF_UP);
+                BigDecimal canteenTotal = subtotal.add(cgst).add(sgst);
+                calculatedTotal = calculatedTotal.add(canteenTotal);
 
                 canteenDTOs.add(
                         CanteenOrderDTO.builder()
@@ -453,14 +565,21 @@ public class OrderService {
                                 .status(co.getStatus() != null ? co.getStatus().name() : "UNKNOWN")
                                 .subtotal(co.getSubtotal())
                                 .createdAt(co.getCreatedAt())
+                                .refunded(co.isRefunded())
+                                .refundStatus(co.getRefundStatus())
+                                .refundRequestedAt(co.getRefundRequestedAt())
+                                .refundCompletedAt(co.getRefundCompletedAt())
+                                .cancelReason(co.getCancelReason())
                                 .items(itemDTOs)
                                 .build());
             }
         }
-
+        
+        // Use calculated total instead of order.getTotalAmount() which may be reduced by refunds
+        // This ensures Past Orders screen always shows the original order amount matching invoices
         return OrderResponseDTO.builder()
                 .orderCode(order.getOrderCode())
-                .totalAmount(order.getTotalAmount())
+                .totalAmount(calculatedTotal)  // ✅ FIX: Use calculated total from canteen orders
                 .status(order.getStatus() != null ? order.getStatus().name() : "UNKNOWN")
                 .createdAt(order.getCreatedAt())
                 .canteenOrders(canteenDTOs)
@@ -476,6 +595,12 @@ public class OrderService {
         List<OrderResponseDTO> dtoList = new ArrayList<>();
 
         for (Order order : orders) {
+            // ✅ ONLY exclude fully cancelled orders
+            // Partially cancelled orders should still appear in Active orders with updated status
+            if (order.getStatus() == OrderStatus.CANCELLED) {
+                continue; // Skip fully cancelled orders - they appear in "My Refunds" only
+            }
+            
             dtoList.add(mapToDTO(order));
         }
 

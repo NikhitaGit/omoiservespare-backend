@@ -21,7 +21,10 @@ public class PaymentTransaction {
     private Order order;
 
     @Column(name = "transaction_id", unique = true)
-    private String transactionId;
+    private String transactionId; // Razorpay Order ID (order_XXXXX)
+
+    @Column(name = "payment_id", unique = true)
+    private String paymentId; // Razorpay Payment ID (pay_XXXXX) - set after payment completion
 
     @Column(name = "gateway_name", nullable = false)
     private String gatewayName; // "razorpay", "phonepe", etc.

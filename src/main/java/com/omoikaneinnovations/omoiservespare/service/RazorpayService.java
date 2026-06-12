@@ -189,6 +189,36 @@ public class RazorpayService {
     }
 
     /**
+     * Fetch refund status from Razorpay
+     */
+    public Map<String, Object> fetchRefundStatus(String razorpayPaymentId, String razorpayRefundId) {
+        try {
+            initializeClient();
+
+            // Use the correct API for Razorpay SDK 1.4.5
+            com.razorpay.Refund refund = razorpayClient.payments.fetchRefund(razorpayPaymentId, razorpayRefundId);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("id", refund.get("id"));
+            response.put("payment_id", refund.get("payment_id"));
+            response.put("amount", refund.get("amount"));
+            response.put("status", refund.get("status"));
+            response.put("created_at", refund.get("created_at"));
+            response.put("speed_requested", refund.has("speed_requested") ? refund.get("speed_requested") : "normal");
+            response.put("speed_processed", refund.has("speed_processed") ? refund.get("speed_processed") : "normal");
+
+            log.info("Refund status fetched - Refund ID: {}, Status: {}", 
+                razorpayRefundId, refund.get("status"));
+
+            return response;
+
+        } catch (Exception e) {
+            log.error("Failed to fetch refund status", e);
+            throw new PaymentException("FETCH_REFUND_FAILED", "Failed to fetch refund status: " + e.getMessage());
+        }
+    }
+
+    /**
      * Generate HMAC-SHA256 signature
      */
     private String generateHmacSha256(String data, String secret) throws Exception {

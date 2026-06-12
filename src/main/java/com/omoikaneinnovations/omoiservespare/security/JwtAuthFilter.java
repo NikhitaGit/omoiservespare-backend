@@ -35,6 +35,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
 
+        // Only skip filter for these truly public endpoints
+        // Note: /api/location is NOT here so filter runs (but endpoint is permitAll in SecurityConfig)
         return path.startsWith("/api/auth")
                 || path.startsWith("/api/canteens")
                 || path.startsWith("/api/menu");
@@ -47,6 +49,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             FilterChain filterChain)
             throws ServletException, IOException {
 
+        String requestPath = request.getRequestURI();
+        logger.info("🔐 JwtAuthFilter running for: {} {}", request.getMethod(), requestPath);
+
         String token = null;
 
         // 🔒 SECURE: Try to get token from httpOnly cookie first
@@ -55,7 +60,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             for (Cookie cookie : cookies) {
                 if ("accessToken".equals(cookie.getName())) {
                     token = cookie.getValue();
-                    logger.debug("Token found in httpOnly cookie");
+                    logger.debug("✅ Token found in httpOnly cookie");
                     break;
                 }
             }
@@ -66,19 +71,21 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 token = authHeader.substring(7);
-                logger.debug("Token found in Authorization header (fallback)");
+                logger.info("✅ Token found in Authorization header for path: {}", requestPath);
             }
         }
 
-        // No token found
+        // No token found - allow request to continue without authentication
+        // (Spring Security will handle authorization based on endpoint config)
         if (token == null) {
+            logger.warn("⚠️ No token found for path: {} - continuing without authentication", requestPath);
             filterChain.doFilter(request, response);
             return;
         }
 
         // Validate token
         if (!jwtUtil.validateToken(token)) {
-            logger.warn("Invalid token");
+            logger.warn("❌ Invalid token for path: {} - continuing without authentication", requestPath);
             SecurityContextHolder.clearContext();
             filterChain.doFilter(request, response);
             return;
@@ -88,12 +95,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String email = jwtUtil.extractEmail(token);
         String accountType = jwtUtil.extractAccountType(token);
 
-        logger.debug("Authenticated user: {} with account type: {}", email, accountType);
+        logger.info("✅ Valid token - email: {}, accountType: {}", email, accountType);
 
         // 🔍 Fetch User entity from database (CRITICAL for SecurityUtils)
         Optional<User> userOptional = userRepository.findByEmail(email);
         if (userOptional.isEmpty()) {
-            logger.warn("User not found in database: {}", email);
+            logger.error("❌ User not found in database: {} - continuing without authentication", email);
             SecurityContextHolder.clearContext();
             filterChain.doFilter(request, response);
             return;
@@ -103,7 +110,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         
         // ✅ Set currentUser attribute for SecurityUtils (CRITICAL FIX)
         request.setAttribute("currentUser", user);
-        logger.debug("Set currentUser attribute: userId={}, email={}", user.getId(), user.getEmail());
+        logger.info("✅ Set currentUser attribute: userId={}, email={}, path={}", user.getId(), user.getEmail(), requestPath);
 
         // 🔐 Create authentication WITHOUT authorities
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
@@ -118,6 +125,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         SecurityContextHolder
                 .getContext()
                 .setAuthentication(authentication);
+
+        logger.info("✅ Authentication set in SecurityContext for user: {}", email);
 
         filterChain.doFilter(request, response);
     }

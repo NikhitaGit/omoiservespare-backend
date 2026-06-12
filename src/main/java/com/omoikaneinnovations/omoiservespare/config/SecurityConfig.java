@@ -61,7 +61,7 @@ public class SecurityConfig {
                                 "/api/util/**"
                         ).permitAll()
 
-                        // 🔒 Protected APIs
+                        // 🔒 Protected APIs (requires authentication)
                         .anyRequest().authenticated())
 
                 // ✅ JWT Filter

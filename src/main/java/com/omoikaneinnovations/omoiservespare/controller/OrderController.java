@@ -142,7 +142,8 @@ public class OrderController {
     public CanteenOrder acceptCancel(
             @PathVariable Long canteenOrderId) {
 
-        return service.acceptCanteenCancellation(canteenOrderId);
+        User vendor = getCurrentUser();
+        return service.acceptCanteenCancellation(canteenOrderId, vendor);
     }
 
     /*
@@ -154,7 +155,8 @@ public class OrderController {
     public CanteenOrder rejectCancel(
             @PathVariable Long canteenOrderId) {
 
-        return service.rejectCanteenCancellation(canteenOrderId);
+        User vendor = getCurrentUser();
+        return service.rejectCanteenCancellation(canteenOrderId, vendor);
     }
 
     @PatchMapping("/{orderCode}/confirm-payment")

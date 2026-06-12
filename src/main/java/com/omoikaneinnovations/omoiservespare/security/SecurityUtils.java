@@ -1,6 +1,8 @@
 package com.omoikaneinnovations.omoiservespare.security;
 
 import com.omoikaneinnovations.omoiservespare.entity.User;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -13,6 +15,8 @@ import jakarta.servlet.http.HttpServletRequest;
  */
 public class SecurityUtils {
     
+    private static final Logger logger = LoggerFactory.getLogger(SecurityUtils.class);
+    
     /**
      * Get current authenticated user from request
      * 
@@ -21,11 +25,20 @@ public class SecurityUtils {
     public static User getCurrentUser() {
         ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (attributes == null) {
+            logger.warn("🔐 SecurityUtils.getCurrentUser() - RequestAttributes is NULL");
             return null;
         }
         
         HttpServletRequest request = attributes.getRequest();
-        return (User) request.getAttribute("currentUser");
+        User user = (User) request.getAttribute("currentUser");
+        
+        if (user == null) {
+            logger.warn("🔐 SecurityUtils.getCurrentUser() - currentUser attribute is NULL for path: {}", request.getRequestURI());
+        } else {
+            logger.debug("🔐 SecurityUtils.getCurrentUser() - Found user: id={}, email={}", user.getId(), user.getEmail());
+        }
+        
+        return user;
     }
     
     /**
@@ -35,7 +48,15 @@ public class SecurityUtils {
      */
     public static Long getCurrentUserId() {
         User user = getCurrentUser();
-        return user != null ? user.getId() : null;
+        Long userId = user != null ? user.getId() : null;
+        
+        if (userId == null) {
+            logger.warn("🔐 SecurityUtils.getCurrentUserId() - Returning NULL");
+        } else {
+            logger.debug("🔐 SecurityUtils.getCurrentUserId() - Returning userId: {}", userId);
+        }
+        
+        return userId;
     }
     
     /**

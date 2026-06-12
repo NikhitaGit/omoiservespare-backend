@@ -3,6 +3,7 @@ package com.omoikaneinnovations.omoiservespare.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -21,7 +22,7 @@ public class Order {
     @Column(unique = true, nullable = false)
     private String orderCode;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "customer_id", nullable = false)
     private User customer;
 
@@ -39,6 +40,7 @@ public class Order {
     private BigDecimal totalAmount;
 
     @OneToMany(mappedBy = "parentOrder", cascade = CascadeType.ALL)
+    @JsonManagedReference
     private List<CanteenOrder> canteenOrders;
 
     private LocalDateTime createdAt;

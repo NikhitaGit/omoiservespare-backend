@@ -5,6 +5,7 @@ import com.omoikaneinnovations.omoiservespare.entity.OrderStatus;
 import com.omoikaneinnovations.omoiservespare.entity.PaymentStatus;
 import com.omoikaneinnovations.omoiservespare.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,17 +18,30 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     Optional<Order> findByOrderCode(String orderCode);
 
-    List<Order> findByCustomer(User customer);
-    
-    // Payment Service methods
+    // Sort by createdAt descending (most recent first)
+    @Query("SELECT o FROM Order o WHERE o.customer = :customer ORDER BY o.createdAt DESC")
+    List<Order> findByCustomer(@Param("customer") User customer);
+
     List<Order> findByCustomerAndStatus(User customer, OrderStatus status);
-    
-    // Payment Scheduler methods
+
+    // Find expired pending orders for cleanup
     List<Order> findByStatusAndPaymentStatusAndCreatedAtBefore(
-        OrderStatus status, 
-        PaymentStatus paymentStatus, 
-        LocalDateTime createdAt
+            OrderStatus status,
+            PaymentStatus paymentStatus,
+            LocalDateTime createdBefore
     );
+
+    // Find old completed orders for cleanup (older than specified date)
+    @Query("SELECT o FROM Order o WHERE o.createdAt < :cutoffDate AND " +
+           "(o.status = 'DELIVERED' OR o.status = 'CANCELLED' OR o.status = 'FAILED')")
+    List<Order> findOldCompletedOrders(@Param("cutoffDate") LocalDateTime cutoffDate);
+    
+    // Delete old completed orders (more efficient)
+    @Modifying
+    @Query("DELETE FROM Order o WHERE o.createdAt < :cutoffDate AND " +
+           "(o.status = 'DELIVERED' OR o.status = 'CANCELLED' OR o.status = 'FAILED')")
+    int deleteOldCompletedOrders(@Param("cutoffDate") LocalDateTime cutoffDate);
+
     
     // ========================================
     // ADMIN DASHBOARD QUERIES

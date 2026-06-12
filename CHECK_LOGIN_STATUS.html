@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check Login Status</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        .logout-btn {
+            background: #dc3545;
+        }
+        .logout-btn:hover {
+            background: #c82333;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border-left: 4px solid #667eea;
+            background: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>🔍 Login Status Checker</h1>
+        
+        <div id="status"></div>
+        
+        <div class="section">
+            <h3>Quick Actions:</h3>
+            <button onclick="checkStatus()">🔄 Refresh Status</button>
+            <button onclick="goToLogin()">🔐 Go to Login</button>
+            <button onclick="goToLocation()">📍 Go to Location</button>
+            <button onclick="clearStorage()" class="logout-btn">🗑️ Clear Storage & Logout</button>
+        </div>
+        
+        <div class="section">
+            <h3>Debug Info:</h3>
+            <pre id="debugInfo"></pre>
+        </div>
+    </div>
+
+    <script>
+        function checkStatus() {
+            const token = localStorage.getItem('token');
+            const userEmail = localStorage.getItem('userEmail');
+            const phoneNumber = localStorage.getItem('phoneNumber');
+            const companyName = localStorage.getItem('companyName');
+            
+            const statusDiv = document.getElementById('status');
+            const debugDiv = document.getElementById('debugInfo');
+            
+            let statusHTML = '';
+            let debugInfo = '';
+            
+            // Check token existence
+            if (!token) {
+                statusHTML += `
+                    <div class="status error">
+                        ❌ NOT LOGGED IN - No authentication token found!
+                        <br><br>
+                        <strong>Solution:</strong> Click "Go to Login" button above and login first.
+                    </div>
+                `;
+                debugInfo += 'Status: NOT LOGGED IN\n';
+                debugInfo += 'Token: null\n';
+                debugInfo += 'Reason: Need to login first\n\n';
+            } else {
+                // Token exists, check if valid
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    const exp = payload.exp * 1000;
+                    const now = Date.now();
+                    const timeLeft = exp - now;
+                    
+                    if (now < exp) {
+                        const minutes = Math.floor(timeLeft / 60000);
+                        const hours = Math.floor(minutes / 60);
+                        
+                        statusHTML += `
+                            <div class="status success">
+                                ✅ LOGGED IN - Token is valid!
+                                <br><br>
+                                Token expires in: ${hours > 0 ? hours + ' hours ' : ''}${minutes % 60} minutes
+                                <br>
+                                You can use location features now! 🎉
+                            </div>
+                        `;
+                        debugInfo += 'Status: LOGGED IN ✅\n';
+                        debugInfo += `Token valid for: ${minutes} minutes\n`;
+                        debugInfo += `Expires at: ${new Date(exp).toLocaleString()}\n\n`;
+                    } else {
+                        statusHTML += `
+                            <div class="status error">
+                                ❌ TOKEN EXPIRED - Your session has expired!
+                                <br><br>
+                                <strong>Solution:</strong> Click "Go to Login" and login again.
+                            </div>
+                        `;
+                        debugInfo += 'Status: TOKEN EXPIRED ❌\n';
+                        debugInfo += `Expired at: ${new Date(exp).toLocaleString()}\n`;
+                        debugInfo += 'Reason: Need to login again\n\n';
+                    }
+                } catch (e) {
+                    statusHTML += `
+                        <div class="status error">
+                            ❌ INVALID TOKEN - Token format is invalid!
+                            <br><br>
+                            <strong>Solution:</strong> Clear storage and login again.
+                        </div>
+                    `;
+                    debugInfo += 'Status: INVALID TOKEN ❌\n';
+                    debugInfo += `Error: ${e.message}\n\n`;
+                }
+            }
+            
+            // Show user info
+            if (userEmail || phoneNumber || companyName) {
+                statusHTML += `
+                    <div class="status info">
+                        <strong>User Information:</strong><br>
+                        ${userEmail ? `📧 Email: ${userEmail}<br>` : ''}
+                        ${phoneNumber ? `📱 Phone: ${phoneNumber}<br>` : ''}
+                        ${companyName ? `🏢 Company: ${companyName}<br>` : ''}
+                    </div>
+                `;
+            }
+            
+            // Debug info
+            debugInfo += '=== LocalStorage Contents ===\n';
+            debugInfo += `token: ${token ? token.substring(0, 50) + '...' : 'null'}\n`;
+            debugInfo += `userEmail: ${userEmail || 'null'}\n`;
+            debugInfo += `phoneNumber: ${phoneNumber || 'null'}\n`;
+            debugInfo += `companyName: ${companyName || 'null'}\n`;
+            debugInfo += `accountType: ${localStorage.getItem('accountType') || 'null'}\n`;
+            debugInfo += `deviceId: ${localStorage.getItem('deviceId') || 'null'}\n`;
+            debugInfo += '\n=== Current URL ===\n';
+            debugInfo += window.location.href + '\n';
+            debugInfo += '\n=== Backend URLs ===\n';
+            debugInfo += 'Local: http://localhost:8080\n';
+            debugInfo += 'Production: https://omniserversspace.backend.onrender.com\n';
+            
+            statusDiv.innerHTML = statusHTML;
+            debugDiv.textContent = debugInfo;
+        }
+        
+        function goToLogin() {
+            window.location.href = '/login';
+        }
+        
+        function goToLocation() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('⚠️ You need to LOGIN first before accessing location features!');
+                if (confirm('Go to login page now?')) {
+                    goToLogin();
+                }
+            } else {
+                window.location.href = '/location';
+            }
+        }
+        
+        function clearStorage() {
+            if (confirm('This will logout and clear all data. Continue?')) {
+                localStorage.clear();
+                alert('✅ Storage cleared! Redirecting to login...');
+                setTimeout(() => goToLogin(), 1000);
+            }
+        }
+        
+        // Check status on load
+        checkStatus();
+        
+        // Refresh every 30 seconds
+        setInterval(checkStatus, 30000);
+    </script>
+</body>
+</html>

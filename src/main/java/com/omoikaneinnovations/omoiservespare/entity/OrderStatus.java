@@ -1,13 +1,14 @@
 package com.omoikaneinnovations.omoiservespare.entity;
 
 public enum OrderStatus {
-    PENDING,            // Payment pending
+    PENDING,            // Order created but payment not verified yet
     ORDER_RECEIVED,
     PREPARING,
     PREPARED,
     DELIVERED,
 
     CANCELLATION_REQUESTED,
-    CANCELLED,          // ✅ vendor accepted
+    PARTIALLY_CANCELLED, // ✅ Some canteen orders cancelled, some active
+    CANCELLED,          // ✅ All canteen orders cancelled (vendor accepted)
     CANCELLATION_REJECTED // ✅ vendor rejected
 }

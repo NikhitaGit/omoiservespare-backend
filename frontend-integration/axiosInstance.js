@@ -42,23 +42,58 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle errors
+// Helper function to check if token is expired
+function isTokenExpired(token) {
+  if (!token) return true;
+  
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const exp = payload.exp * 1000; // Convert to milliseconds
+    const now = Date.now();
+    
+    // Token is expired if expiration time is less than current time
+    // Add 5 second buffer
+    return exp < (now + 5000);
+  } catch (error) {
+    console.error('Error checking token expiration:', error);
+    return true; // If we can't parse, assume expired
+  }
+}
+
+// Response interceptor to handle errors with intelligent 401 handling
 api.interceptors.response.use(
   (response) => {
     return response;
   },
   (error) => {
     if (error.response) {
-      // Handle 401 Unauthorized - auto logout
+      // Handle 401 Unauthorized - but ONLY redirect if token is actually expired
       if (error.response.status === 401) {
-        console.log("401 Unauthorized - clearing session and redirecting to login");
-        localStorage.removeItem('token');
-        localStorage.removeItem('userEmail');
-        localStorage.removeItem('companyName');
-        localStorage.removeItem('phoneNumber');
-        localStorage.removeItem('accountType');
-        localStorage.removeItem('deviceId');
-        window.location.href = '/login';
+        const token = localStorage.getItem('token');
+        const isExpired = isTokenExpired(token);
+        
+        console.log("401 Unauthorized detected");
+        console.log("  Token exists:", !!token);
+        console.log("  Token expired:", isExpired);
+        console.log("  Request URL:", error.config?.url);
+        
+        // CRITICAL FIX: Only auto-redirect if token is missing or expired
+        // This prevents redirecting when user has valid token but endpoint returns 401 for other reasons
+        if (!token || isExpired) {
+          console.log("❌ Token missing or expired - clearing session and redirecting");
+          localStorage.removeItem('token');
+          localStorage.removeItem('userEmail');
+          localStorage.removeItem('companyName');
+          localStorage.removeItem('phoneNumber');
+          localStorage.removeItem('accountType');
+          localStorage.removeItem('deviceId');
+          window.location.href = '/login';
+        } else {
+          console.log("⚠️ Valid token exists but 401 received - NOT auto-redirecting");
+          console.log("   This allows components to handle auth errors gracefully");
+          // Let the component handle the error - don't auto-redirect
+          // The component can show appropriate error message or prompt user to login
+        }
       }
       
       // Return error message from backend

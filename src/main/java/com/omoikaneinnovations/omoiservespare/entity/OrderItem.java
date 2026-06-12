@@ -3,6 +3,7 @@ package com.omoikaneinnovations.omoiservespare.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import java.math.BigDecimal;
 
 @Entity
@@ -17,6 +18,7 @@ public class OrderItem {
 
     @ManyToOne
     @JoinColumn(name = "canteen_order_id", nullable = false)
+    @JsonBackReference
     private CanteenOrder canteenOrder;
 
     @Column(nullable = false)

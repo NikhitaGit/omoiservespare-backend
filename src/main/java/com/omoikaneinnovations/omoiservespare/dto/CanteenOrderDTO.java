@@ -18,6 +18,13 @@ public class CanteenOrderDTO {
     private String status;
     private BigDecimal subtotal;
     private LocalDateTime createdAt;
+    
+    // ✅ Refund information
+    private boolean refunded;
+    private String refundStatus;
+    private LocalDateTime refundRequestedAt;
+    private LocalDateTime refundCompletedAt;
+    private String cancelReason;
 
     private List<OrderItemDTO> items;
 }
