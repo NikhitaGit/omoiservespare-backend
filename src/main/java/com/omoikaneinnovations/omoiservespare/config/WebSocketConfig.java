@@ -45,7 +45,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     "http://localhost:5174",
                     "http://localhost:3000",
                     "https://lata-frontend-flame.vercel.app",
-                    "https://lata-frontend-git-main-omoi-servespare-s-projects.vercel.app"
+                    "https://lata-frontend-git-main-omoi-servespare-s-projects.vercel.app",
+                    "https://omoiservespare-vendor-frontend.vercel.app/",
+                    "https://omoiservespare-vendor-fro-git-a7a731-omoi-servespare-s-projects.vercel.app/"
                 )
                 .withSockJS();
     }
